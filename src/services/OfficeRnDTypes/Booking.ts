@@ -1,4 +1,4 @@
-export type OfficeRndBooking = {
+export type OfficeRnDBooking = {
   _id: string;
   title: string;
   description?: string;

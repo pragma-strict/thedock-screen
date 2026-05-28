@@ -1,6 +1,6 @@
-import { OfficeRndBooking, AppBooking } from "./OfficeRnDTypes/Booking";
+import { OfficeRnDBooking, AppBooking } from "./OfficeRnDTypes/Booking";
 import { OfficeRnDCompany } from "./OfficeRnDTypes/Company";
-import { OfficeRndMeetingRoom } from "./OfficeRnDTypes/MeetingRoom";
+import { OfficeRnDMeetingRoom } from "./OfficeRnDTypes/MeetingRoom";
 import { OfficeRnDFloor } from "./OfficeRnDTypes/Floor";
 import { keyBy } from "../helpers/keyBy";
 import { OfficeRnDMember } from "./OfficeRnDTypes/Member";
@@ -8,8 +8,8 @@ import { OfficeRnDMember } from "./OfficeRnDTypes/Member";
 export class OfficeRnDDataAggregator {
   combineOfficeRnDDataIntoAppBookings = (
     floors: OfficeRnDFloor[],
-    meetingRooms: OfficeRndMeetingRoom[],
-    events: OfficeRndBooking[],
+    meetingRooms: OfficeRnDMeetingRoom[],
+    events: OfficeRnDBooking[],
     companies: OfficeRnDCompany[],
     members: OfficeRnDMember[],
   ): AppBooking[] => {
@@ -39,7 +39,7 @@ export class OfficeRnDDataAggregator {
 
   combineMeetingRoomsAndFloors = (
     floorsById : Record<string, OfficeRnDFloor>,
-    meetingRooms: OfficeRndMeetingRoom[]
+    meetingRooms: OfficeRnDMeetingRoom[]
   ) => {
     const meetingRoomsWithFloor = meetingRooms.map((meetingRoom) => {
       const floor = meetingRoom.floor ? floorsById[meetingRoom.floor] : undefined;

@@ -1,7 +1,7 @@
 import { OfficeRnDDataAggregator } from './OfficeRnDDataAggregator';
-import { AppBooking, OfficeRndBooking } from './OfficeRnDTypes/Booking';
+import { AppBooking, OfficeRnDBooking } from './OfficeRnDTypes/Booking';
 import { OfficeRnDFloor } from './OfficeRnDTypes/Floor';
-import { OfficeRndMeetingRoom } from './OfficeRnDTypes/MeetingRoom';
+import { OfficeRnDMeetingRoom } from './OfficeRnDTypes/MeetingRoom';
 import { OfficeRnDMember } from './OfficeRnDTypes/Member';
 import { OfficeRnDCompany } from './OfficeRnDTypes/Company';
 import {DateTime} from 'luxon';
@@ -84,13 +84,13 @@ export class OfficeRnDService {
   };
 
   private getEvents = async (dateStart: string, dateEnd: string) => {
-    const data = await this.fetchWithToken<V2ListResponse<OfficeRndBooking>>(
+    const data = await this.fetchWithToken<V2ListResponse<OfficeRnDBooking>>(
       `${this.BASE_API_URL}/bookings?seriesStart[$gte]=${dateStart}&seriesStart[$lte]=${dateEnd}`,
     );
     return data.results;
   };
 
-  private filterCanceledAndTomorrowEvents = (events: OfficeRndBooking[]) => {
+  private filterCanceledAndTomorrowEvents = (events: OfficeRnDBooking[]) => {
     return events.filter((event) => !event.isCancelled &&
     (DateTime.fromISO(event.start, {zone: event.timezone})).toISODate() == (DateTime.now().setZone(event.timezone)).toISODate());
   };
@@ -115,7 +115,7 @@ export class OfficeRnDService {
   };
 
   private getMeetingRooms = async () => {
-    const data = await this.fetchWithTokenAndCache<V2ListResponse<OfficeRndMeetingRoom>>(
+    const data = await this.fetchWithTokenAndCache<V2ListResponse<OfficeRnDMeetingRoom>>(
       `${this.BASE_API_URL}/resources?type=meeting_room`,
     );
     return data.results;
@@ -128,7 +128,7 @@ export class OfficeRnDService {
     return data.results;
   };
 
-  private getCompanies = async (bookings: OfficeRndBooking[]) => {
+  private getCompanies = async (bookings: OfficeRnDBooking[]) => {
     const companyPromises = bookings
       .filter((booking) => booking.company)
       .map<Promise<OfficeRnDCompany>>((booking) => {
@@ -137,13 +137,13 @@ export class OfficeRnDService {
     return Promise.all(companyPromises);
   };
 
-  private getCompany = (booking: OfficeRndBooking) => {
+  private getCompany = (booking: OfficeRnDBooking) => {
     return this.fetchWithTokenAndCache<OfficeRnDCompany>(
       `${this.BASE_API_URL}/companies/${booking.company}`,
     );
   };
 
-  private getMembers = async (bookings: OfficeRndBooking[]) => {
+  private getMembers = async (bookings: OfficeRnDBooking[]) => {
     const memberPromises = bookings
       .filter((booking) => booking.member)
       .map<Promise<OfficeRnDMember>>((booking) => {
@@ -153,7 +153,7 @@ export class OfficeRnDService {
   };
 
   private getMember = async (
-    booking: OfficeRndBooking,
+    booking: OfficeRnDBooking,
   ): Promise<OfficeRnDMember> => {
     return this.fetchWithTokenAndCache<OfficeRnDMember>(
       `${this.BASE_API_URL}/members/${booking.member}`,

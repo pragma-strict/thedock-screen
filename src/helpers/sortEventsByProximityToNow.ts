@@ -18,7 +18,7 @@ export const sortEventsByProximityToNow = (events: AppBooking[]): AppBooking[] =
     if (isAFuture && !isBFuture) return -1; // A is future, B is past → A first
     if (!isAFuture && isBFuture) return 1;  // B is future, A is past → B first
 
-    // If both are future or both are past, sort by proximity
-    return diffB - diffA;
+    // If both are future or both are past, sort by proximity (closest to now first)
+    return diffA - diffB;
   });
 };
