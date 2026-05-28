@@ -1,36 +1,30 @@
-// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { DateTime } from 'luxon';
 import {
   SeparateStartedAndUpcomingEvents,
   TrimExpiredEvents,
 } from '../../src/misc/dataProcessing/processEvents';
 import { OfficeRnDService } from '../../src/services/OfficeRnDService';
 
+const TIMEZONE = 'America/Vancouver';
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const currentDate = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  // TODO: Implement correct ISO style
-  const nowDate = currentDate.toLocaleDateString("fr-CA");
-  const tomorrowDate = tomorrow.toLocaleDateString("fr-CA");
+  const now = DateTime.now().setZone(TIMEZONE);
+  const today = now.toISODate()!;
+  const tomorrow = now.plus({ days: 1 }).toISODate()!;
 
   const officeRNDService = new OfficeRnDService();
   const events = await officeRNDService.getEventsWithMeetingRoomsAndHostingTeam(
-    nowDate,
-    tomorrowDate,
+    today,
+    tomorrow,
   );
 
-  const todayEvents = events
-    .filter((event: any) => {
-      return new Date(event.startDateTime).toLocaleDateString("fr-CA") == nowDate;
-    });
-  const todayEventsSorted = todayEvents.sort(function (a, b) {
+  const todayEventsSorted = events.sort(function (a, b) {
     return (
-      new Date(a.startDateTime).getTime() - new Date(b.endDateTime).getTime()
+      new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime()
     );
   });
   const eventsToShow = SeparateStartedAndUpcomingEvents(
