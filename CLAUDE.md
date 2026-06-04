@@ -31,7 +31,7 @@ In production these are set in the Railway project settings.
 
 1. **Frontend** (`pages/index.tsx`) polls `/api/getEvents` every 4 minutes (only between 5am–10pm). Refreshes the clock display every 3 seconds.
 2. **API route** (`pages/api/getEvents.ts`) authenticates with OfficeRnD, fetches today's bookings, filters out cancelled/expired events, and separates them into `{started, upcoming}`.
-3. **OfficeRnDService** (`src/services/OfficeRnDService.ts`) handles OAuth token acquisition and all OfficeRnD REST calls (bookings, meeting rooms, floors, teams, members). Has an in-memory cache (3-day TTL) for relatively static data (rooms, floors, teams, members).
+3. **OfficeRnDService** (`src/services/OfficeRnDService.ts`) handles OAuth token acquisition and all OfficeRnD REST calls (bookings, meeting rooms, floors, teams, members). It fetches the booking series overlapping the window, then expands recurring series into concrete occurrences (`expandRecurringBookings`). Has an in-memory cache (3-day TTL) for relatively static data (rooms, floors, teams, members).
 4. **OfficeRnDDataAggregator** (`src/services/OfficeRnDDataAggregator.tsx`) joins raw OfficeRnD entities (bookings + rooms + floors + teams + members) into `AppBooking` objects used by the frontend.
 5. **processEvents** (`src/misc/dataProcessing/processEvents.ts`) contains `TrimExpiredEvents` and `SeparateStartedAndUpcomingEvents` — pure functions that partition events by time.
 
@@ -44,6 +44,8 @@ In production these are set in the Railway project settings.
 
 Events use `luxon` for timezone-aware date comparison. OfficeRnD bookings carry a `timezone` field (e.g. `America/Vancouver`). The `/api/getEvents` query window is built from `America/Vancouver` day boundaries converted to absolute UTC instants — OfficeRnD interprets bare date strings as UTC midnight, so sending bare dates would shift the window by the venue's UTC offset and drop today's evening bookings.
 
-### Known limitation: recurring bookings
+### Recurring bookings
 
-The OfficeRnD v2 `bookings` endpoint can only be filtered by `seriesStart`/`seriesEnd` (not occurrence `start`/`end`), and it returns recurring bookings as a **single anchor row carrying an `rrule`** — it does not materialize later occurrences. As a result, a recurring series anchored before today (e.g. a weekly meeting) does **not** appear on the screen even when it recurs today/tomorrow. Surfacing these requires expanding the `rrule` client-side (e.g. via the `rrule` package) over the today/tomorrow window — deferred for now.
+The OfficeRnD v2 `bookings` endpoint can only be filtered by `seriesStart`/`seriesEnd` (not occurrence `start`/`end`), and it returns a recurring booking as a **single anchor row carrying an `rrule`** — it does not materialize later occurrences. To surface recurring meetings, `OfficeRnDService.getEvents` uses an **overlap query** (`seriesStart[$lt]=windowEnd & seriesEnd[$gte]=windowStart`) to fetch every series touching the window, and `expandRecurringBookings` (`src/services/expandRecurringBookings.ts`) expands each series' `rrule` (via the `rrule` package) into concrete occurrences within the today/tomorrow window. One-off bookings pass through; each recurring occurrence becomes its own booking with a unique `_id`.
+
+Known caveats (acceptable for a lobby display): occurrences are computed from the anchor's UTC instant, so a DST transition could shift an occurrence's local time by an hour; and a single cancelled occurrence within a series isn't represented by the API in a way we detect, so it could still be shown.

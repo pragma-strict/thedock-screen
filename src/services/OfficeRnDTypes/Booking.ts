@@ -9,6 +9,13 @@ export type OfficeRnDBooking = {
   company: string;
   member: string | null;
   isCancelled?: boolean;
+  // Recurrence: a recurring booking is returned as a single anchor row whose
+  // `start`/`end` are the first occurrence and `recurrence.rrule` is an iCal
+  // RRULE string. Later occurrences are not materialized by the API and must be
+  // expanded client-side (see expandRecurringBookings).
+  recurrence?: { rrule: string | null } | null;
+  seriesStart?: string;
+  seriesEnd?: string;
 };
 
 export type AppBooking = {

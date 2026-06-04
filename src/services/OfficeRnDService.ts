@@ -1,4 +1,5 @@
 import { OfficeRnDDataAggregator } from './OfficeRnDDataAggregator';
+import { expandRecurringBookings } from './expandRecurringBookings';
 import { AppBooking, OfficeRnDBooking } from './OfficeRnDTypes/Booking';
 import { OfficeRnDFloor } from './OfficeRnDTypes/Floor';
 import { OfficeRnDMeetingRoom } from './OfficeRnDTypes/MeetingRoom';
@@ -82,23 +83,22 @@ export class OfficeRnDService {
     return data;
   };
 
-  // Fetch bookings whose series starts within [dateStart, dateEnd) (ISO
-  // instants). Note: bookings can only be filtered by `seriesStart`/`seriesEnd`,
-  // not by occurrence `start`/`end` (the API rejects those). Results are paged
-  // 50 at a time, so we follow `cursorNext` until exhausted.
+  // Fetch every booking series that overlaps the window [dateStart, dateEnd)
+  // (ISO instants): the series starts before the window ends AND ends at/after
+  // the window starts. This catches both one-off bookings and recurring series
+  // anchored earlier (e.g. a weekly meeting that still recurs this week) —
+  // recurrence is then expanded into concrete occurrences downstream.
   //
-  // KNOWN GAP: recurring bookings are returned as a single anchor row carrying
-  // an `rrule`; OfficeRnD does not materialize later occurrences. A series
-  // anchored before today (e.g. a weekly meeting) therefore won't appear on the
-  // screen even when it recurs today/tomorrow. Surfacing those needs client-side
-  // rrule expansion — deliberately deferred (see CLAUDE.md).
+  // Bookings can only be filtered by `seriesStart`/`seriesEnd`, not by
+  // occurrence `start`/`end` (the API rejects those). Results are paged 50 at a
+  // time, so we follow `cursorNext` until exhausted.
   private getEvents = async (dateStart: string, dateEnd: string) => {
     const results: OfficeRnDBooking[] = [];
     let cursor: string | undefined;
     do {
       const qs =
-        `seriesStart[$gte]=${encodeURIComponent(dateStart)}` +
-        `&seriesStart[$lt]=${encodeURIComponent(dateEnd)}` +
+        `seriesStart[$lt]=${encodeURIComponent(dateEnd)}` +
+        `&seriesEnd[$gte]=${encodeURIComponent(dateStart)}` +
         `&$limit=50` +
         (cursor ? `&$cursorNext=${encodeURIComponent(cursor)}` : '');
       const data = await this.fetchWithToken<V2ListResponse<OfficeRnDBooking>>(
@@ -124,12 +124,22 @@ export class OfficeRnDService {
     const meetingRooms = await this.getMeetingRooms();
     const allEvents = await this.getEvents(dateStart, dateEnd);
     const events = this.filterCancelledEvents(allEvents);
+    // Expand recurring series into concrete occurrences within the window, and
+    // drop one-off bookings that fall outside it (the overlap query can return
+    // series whose anchor occurrence is before the window).
+    const occurrences = expandRecurringBookings(
+      events,
+      new Date(dateStart),
+      new Date(dateEnd),
+    );
+    // Companies/members are shared by all occurrences of a series, so resolve
+    // them from the (deduplicated) anchor rows rather than every occurrence.
     const companies = await this.getCompanies(events);
     const members = await this.getMembers(events);
     return this.aggregator.combineOfficeRnDDataIntoAppBookings(
       floors,
       meetingRooms,
-      events,
+      occurrences,
       companies,
       members,
     );
