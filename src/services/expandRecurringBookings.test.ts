@@ -57,6 +57,20 @@ test('recurring anchor that itself lands in the window is included', () => {
   expect(out.map((o) => o.start)).toEqual(['2026-06-04T21:00:00.000Z']);
 });
 
+test('evening series recurs on the correct local weekday (not the UTC one)', () => {
+  // 6pm Vancouver = next-day 01:00 UTC, so the anchor's UTC weekday (Fri) differs
+  // from its local weekday (Thu). The rule says BYDAY=TH (local); today is Thu
+  // Jun 4, so tonight's occurrence must appear — expanding in UTC would miss it.
+  const b = booking({
+    start: '2026-05-22T01:00:00.000Z', // Thu May 21 18:00 America/Vancouver
+    end: '2026-05-22T03:00:00.000Z', // 2h
+    recurrence: { rrule: 'FREQ=WEEKLY;BYDAY=TH;WKST=SU' },
+  });
+  const out = expandRecurringBookings([b], windowStart, windowEnd);
+  expect(out.map((o) => o.start)).toEqual(['2026-06-05T01:00:00.000Z']); // Thu Jun 4 18:00 local
+  expect(out[0].end).toBe('2026-06-05T03:00:00.000Z');
+});
+
 test('expired recurring series (COUNT exhausted before window) yields nothing', () => {
   const b = booking({
     start: '2026-05-01T17:00:00.000Z',
