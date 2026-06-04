@@ -4,7 +4,6 @@ import { OfficeRnDFloor } from './OfficeRnDTypes/Floor';
 import { OfficeRnDMeetingRoom } from './OfficeRnDTypes/MeetingRoom';
 import { OfficeRnDMember } from './OfficeRnDTypes/Member';
 import { OfficeRnDCompany } from './OfficeRnDTypes/Company';
-import {DateTime} from 'luxon';
 
 const ONE_DAY_IN_MS = 1000 * 60 * 60 * 24; // 1 day
 const DEFAULT_CACHE_TIME_IN_MS = 3 * ONE_DAY_IN_MS; // 3 days
@@ -83,16 +82,38 @@ export class OfficeRnDService {
     return data;
   };
 
+  // Fetch bookings whose series starts within [dateStart, dateEnd) (ISO
+  // instants). Note: bookings can only be filtered by `seriesStart`/`seriesEnd`,
+  // not by occurrence `start`/`end` (the API rejects those). Results are paged
+  // 50 at a time, so we follow `cursorNext` until exhausted.
+  //
+  // KNOWN GAP: recurring bookings are returned as a single anchor row carrying
+  // an `rrule`; OfficeRnD does not materialize later occurrences. A series
+  // anchored before today (e.g. a weekly meeting) therefore won't appear on the
+  // screen even when it recurs today/tomorrow. Surfacing those needs client-side
+  // rrule expansion — deliberately deferred (see CLAUDE.md).
   private getEvents = async (dateStart: string, dateEnd: string) => {
-    const data = await this.fetchWithToken<V2ListResponse<OfficeRnDBooking>>(
-      `${this.BASE_API_URL}/bookings?seriesStart[$gte]=${dateStart}&seriesStart[$lte]=${dateEnd}`,
-    );
-    return data.results;
+    const results: OfficeRnDBooking[] = [];
+    let cursor: string | undefined;
+    do {
+      const qs =
+        `seriesStart[$gte]=${encodeURIComponent(dateStart)}` +
+        `&seriesStart[$lt]=${encodeURIComponent(dateEnd)}` +
+        `&$limit=50` +
+        (cursor ? `&$cursorNext=${encodeURIComponent(cursor)}` : '');
+      const data = await this.fetchWithToken<V2ListResponse<OfficeRnDBooking>>(
+        `${this.BASE_API_URL}/bookings?${qs}`,
+      );
+      results.push(...data.results);
+      cursor = data.cursorNext;
+    } while (cursor);
+    return results;
   };
 
-  private filterCanceledAndTomorrowEvents = (events: OfficeRnDBooking[]) => {
-    return events.filter((event) => !event.isCancelled &&
-    (DateTime.fromISO(event.start, {zone: event.timezone})).toISODate() == (DateTime.now().setZone(event.timezone)).toISODate());
+  // The date window is enforced by the `seriesStart` query and the today/
+  // tomorrow split downstream, so here we only need to drop cancelled bookings.
+  private filterCancelledEvents = (events: OfficeRnDBooking[]) => {
+    return events.filter((event) => !event.isCancelled);
   };
 
   getEventsWithMeetingRoomsAndHostingTeam = async (
@@ -102,7 +123,7 @@ export class OfficeRnDService {
     const floors = await this.getFloors();
     const meetingRooms = await this.getMeetingRooms();
     const allEvents = await this.getEvents(dateStart, dateEnd);
-    const events = this.filterCanceledAndTomorrowEvents(allEvents);
+    const events = this.filterCancelledEvents(allEvents);
     const companies = await this.getCompanies(events);
     const members = await this.getMembers(events);
     return this.aggregator.combineOfficeRnDDataIntoAppBookings(

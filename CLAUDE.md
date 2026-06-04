@@ -42,4 +42,8 @@ In production these are set in the Railway project settings.
 
 ### Timezone Handling
 
-Events use `luxon` for timezone-aware date comparison. OfficeRnD bookings carry a `timezone` field (e.g. `America/Vancouver`) and filtering uses Luxon's `DateTime.fromISO` with zone awareness.
+Events use `luxon` for timezone-aware date comparison. OfficeRnD bookings carry a `timezone` field (e.g. `America/Vancouver`). The `/api/getEvents` query window is built from `America/Vancouver` day boundaries converted to absolute UTC instants — OfficeRnD interprets bare date strings as UTC midnight, so sending bare dates would shift the window by the venue's UTC offset and drop today's evening bookings.
+
+### Known limitation: recurring bookings
+
+The OfficeRnD v2 `bookings` endpoint can only be filtered by `seriesStart`/`seriesEnd` (not occurrence `start`/`end`), and it returns recurring bookings as a **single anchor row carrying an `rrule`** — it does not materialize later occurrences. As a result, a recurring series anchored before today (e.g. a weekly meeting) does **not** appear on the screen even when it recurs today/tomorrow. Surfacing these requires expanding the `rrule` client-side (e.g. via the `rrule` package) over the today/tomorrow window — deferred for now.

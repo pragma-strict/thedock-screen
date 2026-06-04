@@ -20,6 +20,7 @@ export default function Home() {
   const [eventData, setEventData] = useState({
     started: Array<AppBooking>(),
     upcoming: Array<AppBooking>(),
+    tomorrow: Array<AppBooking>(),
   });
   const currentTimeEvent = new Date();
   // Only fetching events during 5 - 22
@@ -34,10 +35,11 @@ export default function Home() {
         else return res.json();
       })
       .then((apiEventData) => {
-        if (apiEventData.length == 0) {
-          return;
-        }
-        setEventData(apiEventData);
+        setEventData({
+          started: apiEventData.started ?? [],
+          upcoming: apiEventData.upcoming ?? [],
+          tomorrow: apiEventData.tomorrow ?? [],
+        });
       })
       .catch((e) => {
         console.error('Error fetching events');
@@ -59,26 +61,23 @@ export default function Home() {
     return null;
   }
 
-  const eventsHappeningNow = sortEventsByProximityToNow(eventData.started);
-  const eventsComingSoon = sortBookingByTimeAsc(eventData.upcoming);
+  // Each section renders only when it has events, so the layout flexes to
+  // whatever is actually happening. Adding a section is just another entry here.
+  const sections = [
+    {
+      title: 'Happening right now',
+      events: sortEventsByProximityToNow(eventData.started),
+    },
+    { title: 'Later today', events: sortBookingByTimeAsc(eventData.upcoming) },
+    { title: 'Tomorrow', events: sortBookingByTimeAsc(eventData.tomorrow) },
+  ].filter((section) => section.events.length > 0);
 
   return (
     <div className='event_page'>
       <div className='child_section left_section no-scrollbar'>
-        <Section title='Happening right now'>
-          <div className='event_section__list'>
-            {eventsHappeningNow.map((event) => (
-              <Event event={event} key={event._id} />
-            ))}
-          </div>
-        </Section>
-        <Section title='Later'>
-          <div className='event_section__list'>
-            {eventsComingSoon.map((event) => (
-              <Event event={event} key={event._id} />
-            ))}
-          </div>
-        </Section>
+        {sections.map((section) => (
+          <Section key={section.title} title={section.title} events={section.events} />
+        ))}
       </div>
       <div className='child_section right_section'>
         <div className='display-time'>
@@ -103,11 +102,15 @@ export default function Home() {
   );
 }
 
-const Section = (props: PropsWithChildren<{ title: string; }>) => {
+const Section = ({ title, events }: { title: string; events: AppBooking[]; }) => {
   return (
     <section className='event_section'>
-      <SectionTitle>{props.title}</SectionTitle>
-      {props.children}
+      <SectionTitle>{title}</SectionTitle>
+      <div className='event_section__list'>
+        {events.map((event) => (
+          <Event event={event} key={event._id} />
+        ))}
+      </div>
     </section>
   );
 };
