@@ -52,10 +52,18 @@ function EventTimeComponent({ start, end, now }: { start: Date; end: Date; now?:
     return <div className='eventTime'>{formatRemaining(end, now)}</div>;
   }
 
+  // Drop the redundant meridiem from the start when both sides share it, so
+  // "1:00 PM - 2:00 PM" reads as "1:00 - 2:00 PM". Otherwise keep both.
+  const startStr = formatTime(start);
+  const endStr = formatTime(end);
+  const startDisplay =
+    meridiemOf(startStr) === meridiemOf(endStr)
+      ? stripMeridiem(startStr)
+      : startStr;
   return (
     <div className='eventTime'>
-      <span className='noWrap'>{formatTime(new Date(start))}</span> {' - '}
-      <span className='noWrap'>{formatTime(new Date(end))}</span>
+      <span className='noWrap'>{startDisplay}</span> {' - '}
+      <span className='noWrap'>{endStr}</span>
     </div>
   );
 }
@@ -80,6 +88,10 @@ const formatTime = (date: Date | number) => {
     timeStyle: 'short',
   }).format(date);
 };
+
+// en-US short time always ends in "AM"/"PM" (e.g. "1:00 PM").
+const meridiemOf = (time: string) => time.match(/(AM|PM)$/i)?.[0];
+const stripMeridiem = (time: string) => time.replace(/\s*(AM|PM)$/i, '');
 
 const getEventStyle = (event: AppBooking) => {
   // Default to Floor 1 if nothing is found
