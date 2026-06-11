@@ -2,40 +2,69 @@ import { COLOR_USAGES } from '../constant/COLOR_USAGES';
 import { AppBooking } from '../services/OfficeRnDTypes/Booking';
 import React, { useEffect, useRef } from 'react';
 
-export default function Event({ event, now }: { event: AppBooking; now?: Date; }) {
+export default function Event({
+  event,
+  now,
+  screenFloor,
+}: {
+  event: AppBooking;
+  now?: Date;
+  screenFloor: number;
+}) {
   const style = getEventStyle(event);
   const messageRef = useRef<null | HTMLDivElement>(null);
 
-  const dataToShow = event.summary
-    ? {
-      title: event.summary,
-      description: event.host,
-    }
-    : {
-      title: event.host,
-      description: event.summary,
-    };
+  // The meeting summary is the title; the organization moves up into the label
+  // line (replacing the redundant floor). When there's no summary, fall back to
+  // the org as the title so the card isn't blank — and then drop it from the
+  // label to avoid showing the same name twice.
+  // Organization sits top-left; the meeting summary is the title. When there's
+  // no summary, the org becomes the title instead (and is dropped from top-left
+  // so it isn't shown twice). The room — plus the floor when off-screen — sits
+  // bottom-right, e.g. "Boardroom" or "3rd Floor · Boardroom".
+  const title = event.summary || event.host;
+  const orgLabel = event.summary ? event.host : '';
+  const floorLabel = offScreenFloorLabel(event.floor, screenFloor);
+  const roomLabel = floorLabel ? `${floorLabel} · ${event.room}` : event.room;
+
   return (
     <div ref={messageRef} className='event' style={style}>
       <div className='eventDetails'>
         <div className='eventRoomAndTime'>
-          <span className='eventRoom'>
-            {event.floor} - {event.room}
-          </span>
+          <span className='eventOrg'>{orgLabel}</span>
           <EventTimeComponent
             start={new Date(event.startDateTime)}
             end={new Date(event.endDateTime)}
             now={now}
           />
         </div>
-        <div className='eventTitle kollectif'>{dataToShow.title}</div>
-        {dataToShow.description ? (
-          <div className='eventDescription'>{dataToShow.description}</div>
-        ) : ''}
+        <div className='eventTitleRow'>
+          <div className='eventTitle kollectif'>{title}</div>
+          {event.room ? <span className='eventRoom'>{roomLabel}</span> : null}
+        </div>
       </div>
     </div>
   );
 }
+
+// Returns 1 or 3 from a floor name like "Floor 1" / "3rd Floor" (matching the
+// convention getEventStyle already relies on), or undefined if unrecognized.
+const floorNumberOf = (floorName: string): number | undefined => {
+  if (floorName?.includes('3')) return 3;
+  if (floorName?.includes('1')) return 1;
+  return undefined;
+};
+
+// The event's floor name, shown only when it differs from the screen's own
+// floor — a same-floor event needs no label since that floor is assumed.
+const offScreenFloorLabel = (
+  eventFloor: string,
+  screenFloor: number,
+): string | undefined => {
+  const eventNumber = floorNumberOf(eventFloor);
+  if (eventNumber === undefined || eventNumber === screenFloor) return undefined;
+  return eventFloor;
+};
 
 const isBookingAllDay = (start: Date, end: Date): boolean => {
   const dayInMilliseconds = 1000 * 60 * 60 * 24;

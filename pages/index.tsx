@@ -6,6 +6,7 @@ import {
   TrimExpiredEvents,
 } from '@/src/misc/dataProcessing/processEvents';
 import { AppBooking } from '@/src/services/OfficeRnDTypes/Booking';
+import { useRouter } from 'next/router';
 import React, { PropsWithChildren, useState, useEffect } from 'react';
 
 // Screen refresh is decoupled from data fetching: the clock ticks every second
@@ -24,6 +25,12 @@ export default function Home() {
       clearInterval(timeIntervalId);
     };
   }, []);
+
+  // Which floor is this screen on? Set per kiosk via the URL (e.g. /?floor=1).
+  // Events on the same floor show no floor label; events elsewhere show
+  // "Upstairs"/"Downstairs" relative to this value.
+  const { floor } = useRouter().query;
+  const screenFloor = parseScreenFloor(floor);
 
   // Raw buckets from the API: today's events (regardless of started/finished)
   // and tomorrow's. The started/upcoming/finished split is derived below from
@@ -95,6 +102,7 @@ export default function Home() {
             title={section.title}
             events={section.events}
             now={section.now}
+            screenFloor={screenFloor}
           />
         ))}
       </div>
@@ -125,17 +133,19 @@ const Section = ({
   title,
   events,
   now,
+  screenFloor,
 }: {
   title: string;
   events: AppBooking[];
   now?: Date;
+  screenFloor: number;
 }) => {
   return (
     <section className='event_section'>
       <SectionTitle>{title}</SectionTitle>
       <div className='event_section__list'>
         {events.map((event) => (
-          <Event event={event} now={now} key={event._id} />
+          <Event event={event} now={now} screenFloor={screenFloor} key={event._id} />
         ))}
       </div>
     </section>
@@ -144,4 +154,13 @@ const Section = ({
 
 const SectionTitle = ({ children }: PropsWithChildren<{}>) => {
   return <div className='event_section__title'>{children}</div>;
+};
+
+// Reads the screen's floor from the ?floor= query param, defaulting to the
+// first floor when absent or non-numeric (e.g. an unconfigured screen).
+const DEFAULT_SCREEN_FLOOR = 1;
+const parseScreenFloor = (floor: string | string[] | undefined): number => {
+  const value = Array.isArray(floor) ? floor[0] : floor;
+  const parsed = Number(value);
+  return value && Number.isFinite(parsed) ? parsed : DEFAULT_SCREEN_FLOOR;
 };

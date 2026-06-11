@@ -82,6 +82,9 @@ a {
   min-height: 100%;
   flex: 1.5 0 0;
   overflow: scroll;
+  /* Narrower horizontal padding than the default 3rem to give the events a
+     couple extra rem of width; vertical stays 3rem to keep the top spacing. */
+  padding: 3rem 2rem;
   /* Fixed gap between visible sections. Sections size to their content (no
      flex-grow), so this is the same regardless of how many events each holds
      or which sections are hidden. */
@@ -137,10 +140,25 @@ a {
   gap: 0.4rem;
 }
 
+/* Title takes the remaining width and wraps; the room badge keeps its own
+   space at the bottom-right so a long title can never overlap it. */
+.eventTitleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
 .eventTitle {
-  width: 100%;
+  flex: 1;
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+.eventRoom {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 1rem;
 }
 
 .eventRoomAndTime {
@@ -149,7 +167,7 @@ a {
   gap: 1rem;
 }
 
-.eventRoom {
+.eventOrg {
   flex: 1;
 }
 
