@@ -30,6 +30,7 @@ export type AppBooking = {
   floor: string;
   summary: string;
   host: string;
-  hasCoffee: boolean;
+  // Number of people the coffee service is attached for; 0 when no coffee.
+  coffeeCount: number;
 };
 

@@ -27,9 +27,13 @@ export default function Event({
       <div className='eventDetails'>
         <div className='eventRoomAndTime'>
           <span className='eventOrg' style={{ color: colors.accent }}>{orgLabel}</span>
-          {event.hasCoffee ? (
-            <span className='eventCoffee' role='img' aria-label='Coffee service'>
-              ☕
+          {event.coffeeCount > 0 ? (
+            <span
+              className='eventCoffee'
+              role='img'
+              aria-label={`Coffee service for ${event.coffeeCount}`}
+            >
+              ☕ x{event.coffeeCount}
             </span>
           ) : null}
           <EventTimeComponent

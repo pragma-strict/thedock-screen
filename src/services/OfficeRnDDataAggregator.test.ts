@@ -42,7 +42,7 @@ test('combineOfficeRnDDataIntoAppBookings combines a set of single entry data it
       floor: "Test Floor",
       summary: "",
       host: "Test Company",
-      hasCoffee: false,
+      coffeeCount: 0,
     }]
   )
 })
@@ -77,7 +77,7 @@ test('combineOfficeRnDDataIntoAppBookings uses member name as host when no compa
       floor: '',
       summary: "",
       host: "Test Member",
-      hasCoffee: false,
+      coffeeCount: 0,
     }]
   )
 })

@@ -33,9 +33,10 @@ export class OfficeRnDDataAggregator {
         room: meetingRoom?.name || '',
         floor: meetingRoom?.floor || '',
         host: company?.name || member?.name || '',
-        hasCoffee:
-          !!coffeePlanId &&
-          (event.extras ?? []).some((extra) => extra._id === coffeePlanId),
+        coffeeCount: coffeePlanId
+          ? (event.extras ?? []).find((extra) => extra._id === coffeePlanId)
+              ?.count ?? 0
+          : 0,
       } as AppBooking;
     });
     return eventsWithMeetingRooms;
