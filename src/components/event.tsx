@@ -11,13 +11,9 @@ export default function Event({
   now?: Date;
   screenFloor: number;
 }) {
-  const style = getEventStyle(event);
+  const colors = getFloorColors(event);
   const messageRef = useRef<null | HTMLDivElement>(null);
 
-  // The meeting summary is the title; the organization moves up into the label
-  // line (replacing the redundant floor). When there's no summary, fall back to
-  // the org as the title so the card isn't blank — and then drop it from the
-  // label to avoid showing the same name twice.
   // Organization sits top-left; the meeting summary is the title. When there's
   // no summary, the org becomes the title instead (and is dropped from top-left
   // so it isn't shown twice). The room — plus the floor when off-screen — sits
@@ -25,13 +21,12 @@ export default function Event({
   const title = event.summary || event.host;
   const orgLabel = event.summary ? event.host : '';
   const floorLabel = offScreenFloorLabel(event.floor, screenFloor);
-  const roomLabel = floorLabel ? `${floorLabel} · ${event.room}` : event.room;
 
   return (
-    <div ref={messageRef} className='event' style={style}>
+    <div ref={messageRef} className='event' style={{ backgroundColor: colors.background }}>
       <div className='eventDetails'>
         <div className='eventRoomAndTime'>
-          <span className='eventOrg'>{orgLabel}</span>
+          <span className='eventOrg' style={{ color: colors.accent }}>{orgLabel}</span>
           <EventTimeComponent
             start={new Date(event.startDateTime)}
             end={new Date(event.endDateTime)}
@@ -40,7 +35,16 @@ export default function Event({
         </div>
         <div className='eventTitleRow'>
           <div className='eventTitle kollectif'>{title}</div>
-          {event.room ? <span className='eventRoom'>{roomLabel}</span> : null}
+          {event.room ? (
+            <span className='eventRoom'>
+              {floorLabel ? (
+                <span style={{ color: colors.accent, fontWeight: 400 }}>
+                  {floorLabel} ·{' '}
+                </span>
+              ) : null}
+              {event.room}
+            </span>
+          ) : null}
         </div>
       </div>
     </div>
@@ -122,16 +126,12 @@ const formatTime = (date: Date | number) => {
 const meridiemOf = (time: string) => time.match(/(AM|PM)$/i)?.[0];
 const stripMeridiem = (time: string) => time.replace(/\s*(AM|PM)$/i, '');
 
-const getEventStyle = (event: AppBooking) => {
-  // Default to Floor 1 if nothing is found
-  if (event.floor === undefined) {
-    return { backgroundColor: COLOR_USAGES.FLOOR_1 };
+// Card background + matching accent (a lighter tint) for an event's floor.
+// Defaults to Floor 1's colors when the floor is missing or unrecognized.
+const getFloorColors = (event: AppBooking) => {
+  if (floorNumberOf(event.floor) === 3) {
+    return { background: COLOR_USAGES.FLOOR_3, accent: COLOR_USAGES.FLOOR_3_ALT };
   }
-  if (event.floor.includes('1')) {
-    return { backgroundColor: COLOR_USAGES.FLOOR_1 };
-  }
-  if (event.floor.includes('3')) {
-    return { backgroundColor: COLOR_USAGES.FLOOR_3 };
-  }
+  return { background: COLOR_USAGES.FLOOR_1, accent: COLOR_USAGES.FLOOR_1_ALT };
 };
 
