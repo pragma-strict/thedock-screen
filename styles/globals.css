@@ -82,6 +82,10 @@ a {
   min-height: 100%;
   flex: 1.5 0 0;
   overflow: scroll;
+  /* Fixed gap between visible sections. Sections size to their content (no
+     flex-grow), so this is the same regardless of how many events each holds
+     or which sections are hidden. */
+  gap: 2rem;
 }
 
 .event_section {
@@ -89,7 +93,6 @@ a {
   align-items: flex-start;
   flex-direction: column;
   gap: 0.5rem;
-  flex: 1 0 0;
   align-self: stretch;
 }
 
@@ -104,15 +107,12 @@ a {
 
 .event_section__list {
   display: flex;
-  padding: 0.5rem;
+  /* No horizontal padding so events sit flush-left with the section title. */
+  padding: 0.5rem 0;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
-  flex: 1 0 0;
   align-self: stretch;
-
-  overflow: auto;
-  max-height: 100%;
 }
 
 .right_section {
