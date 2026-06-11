@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { DateTime } from 'luxon';
 import {
-  SeparateStartedAndUpcomingEvents,
   SeparateTodayAndTomorrowEvents,
   TrimExpiredEvents,
 } from '../../src/misc/dataProcessing/processEvents';
@@ -32,11 +31,11 @@ export default async function handler(
     );
   });
   const activeEvents = TrimExpiredEvents(todayEventsSorted, new Date());
+  // Split today vs. tomorrow here (timezone-sensitive, changes only near
+  // midnight). The started/upcoming/finished partition is derived on the client
+  // each minute from the current time, so finished events disappear promptly
+  // without waiting for the next fetch.
   const { today: todaysEvents, tomorrow: tomorrowsEvents } =
     SeparateTodayAndTomorrowEvents(activeEvents, new Date(), TIMEZONE);
-  const { started, upcoming } = SeparateStartedAndUpcomingEvents(
-    todaysEvents,
-    new Date(),
-  );
-  res.status(200).json({ started, upcoming, tomorrow: tomorrowsEvents });
+  res.status(200).json({ today: todaysEvents, tomorrow: tomorrowsEvents });
 }

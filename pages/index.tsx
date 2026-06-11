@@ -1,32 +1,42 @@
 import Event from '@/src/components/event';
 import { sortEventsByProximityToNow } from '@/src/helpers/sortEventsByProximityToNow';
 import { sortBookingByTimeAsc } from '@/src/helpers/sortEventsByStartTimeAsc';
+import {
+  SeparateStartedAndUpcomingEvents,
+  TrimExpiredEvents,
+} from '@/src/misc/dataProcessing/processEvents';
 import { AppBooking } from '@/src/services/OfficeRnDTypes/Booking';
 import React, { PropsWithChildren, useState, useEffect } from 'react';
-const TIME_TO_REFRESH = 3000; // 3 seconds refresh
-const TIME_TO_GET_REQUEST = 240000; // 4 minutes refershing token
+
+// Screen refresh is decoupled from data fetching: the clock ticks every second
+// so the view re-derives which events are finished/started/upcoming on the fly,
+// while the (relatively expensive) API fetch happens only every few minutes.
+const SCREEN_UPDATE_INTERVAL = 1000; // 1 second — keeps clock + countdowns live
+const DATA_FETCH_INTERVAL = 300000; // 5 minutes
 
 export default function Home() {
   const [currentTime, setRealTime] = useState(new Date());
   useEffect(() => {
     const timeIntervalId = setInterval(function () {
       setRealTime(new Date());
-    }, TIME_TO_REFRESH);
+    }, SCREEN_UPDATE_INTERVAL);
     return () => {
       clearInterval(timeIntervalId);
     };
   }, []);
 
+  // Raw buckets from the API: today's events (regardless of started/finished)
+  // and tomorrow's. The started/upcoming/finished split is derived below from
+  // the live clock, not baked in here, so it stays current between fetches.
   const [eventData, setEventData] = useState({
-    started: Array<AppBooking>(),
-    upcoming: Array<AppBooking>(),
+    today: Array<AppBooking>(),
     tomorrow: Array<AppBooking>(),
   });
-  const currentTimeEvent = new Date();
-  // Only fetching events during 5 - 22
 
   const controlledFetchedEvents = function () {
-    if (currentTimeEvent.getHours() > 22 || currentTimeEvent.getHours() < 5) {
+    // Only fetch during operating hours (5:00–22:59).
+    const nowHour = new Date().getHours();
+    if (nowHour > 22 || nowHour < 5) {
       return null;
     }
     fetch('/api/getEvents')
@@ -36,8 +46,7 @@ export default function Home() {
       })
       .then((apiEventData) => {
         setEventData({
-          started: apiEventData.started ?? [],
-          upcoming: apiEventData.upcoming ?? [],
+          today: apiEventData.today ?? [],
           tomorrow: apiEventData.tomorrow ?? [],
         });
       })
@@ -52,23 +61,28 @@ export default function Home() {
     controlledFetchedEvents(); // First time to fire off instantly
     const intervalId = setInterval(() => {
       controlledFetchedEvents();
-    }, TIME_TO_GET_REQUEST);
+    }, DATA_FETCH_INTERVAL);
     return () => clearInterval(intervalId);
   }, []);
 
-  if (!eventData) {
-    // If encounter event data problems --> stop rendering
-    return null;
-  }
+  // Derive the live view from the current clock: drop finished events, then
+  // split the rest into already-started vs. still-upcoming. Re-runs every tick.
+  const activeToday = TrimExpiredEvents(eventData.today, currentTime);
+  const { started, upcoming } = SeparateStartedAndUpcomingEvents(
+    activeToday,
+    currentTime,
+  );
 
   // Each section renders only when it has events, so the layout flexes to
   // whatever is actually happening. Adding a section is just another entry here.
   const sections = [
     {
       title: 'Happening right now',
-      events: sortEventsByProximityToNow(eventData.started),
+      events: sortEventsByProximityToNow(started),
+      // Render these events as a live countdown of remaining time.
+      now: currentTime,
     },
-    { title: 'Later today', events: sortBookingByTimeAsc(eventData.upcoming) },
+    { title: 'Later today', events: sortBookingByTimeAsc(upcoming) },
     { title: 'Tomorrow', events: sortBookingByTimeAsc(eventData.tomorrow) },
   ].filter((section) => section.events.length > 0);
 
@@ -76,7 +90,12 @@ export default function Home() {
     <div className='event_page'>
       <div className='child_section left_section no-scrollbar'>
         {sections.map((section) => (
-          <Section key={section.title} title={section.title} events={section.events} />
+          <Section
+            key={section.title}
+            title={section.title}
+            events={section.events}
+            now={section.now}
+          />
         ))}
       </div>
       <div className='child_section right_section'>
@@ -102,13 +121,21 @@ export default function Home() {
   );
 }
 
-const Section = ({ title, events }: { title: string; events: AppBooking[]; }) => {
+const Section = ({
+  title,
+  events,
+  now,
+}: {
+  title: string;
+  events: AppBooking[];
+  now?: Date;
+}) => {
   return (
     <section className='event_section'>
       <SectionTitle>{title}</SectionTitle>
       <div className='event_section__list'>
         {events.map((event) => (
-          <Event event={event} key={event._id} />
+          <Event event={event} now={now} key={event._id} />
         ))}
       </div>
     </section>
