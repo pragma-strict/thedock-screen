@@ -167,6 +167,12 @@ a {
   gap: 1rem;
 }
 
+.eventCoffee {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .eventOrg {
   flex: 1;
 }

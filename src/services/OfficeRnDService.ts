@@ -5,6 +5,7 @@ import { OfficeRnDFloor } from './OfficeRnDTypes/Floor';
 import { OfficeRnDMeetingRoom } from './OfficeRnDTypes/MeetingRoom';
 import { OfficeRnDMember } from './OfficeRnDTypes/Member';
 import { OfficeRnDCompany } from './OfficeRnDTypes/Company';
+import { OfficeRnDPlan } from './OfficeRnDTypes/Plan';
 
 const ONE_DAY_IN_MS = 1000 * 60 * 60 * 24; // 1 day
 const DEFAULT_CACHE_TIME_IN_MS = 3 * ONE_DAY_IN_MS; // 3 days
@@ -15,7 +16,13 @@ const DEFAULT_SCOPE = [
   'flex.space.floors.read',
   'flex.community.members.read',
   'flex.community.companies.read',
+  // Plans cover add-on services (e.g. the "Coffee/Tea Service" booking extra);
+  // we read them to map a booking's extra ids to a recognizable name.
+  'flex.billing.plans.read',
 ].join(' ');
+
+// Booking extras reference a plan named like this when coffee is included.
+const COFFEE_PLAN_NAME_PATTERN = /coffee/i;
 
 // v2 list endpoints wrap results in { results: T[] }
 type V2ListResponse<T> = {
@@ -136,13 +143,45 @@ export class OfficeRnDService {
     // them from the (deduplicated) anchor rows rather than every occurrence.
     const companies = await this.getCompanies(events);
     const members = await this.getMembers(events);
+    const coffeePlanId = await this.getCoffeePlanId();
     return this.aggregator.combineOfficeRnDDataIntoAppBookings(
       floors,
       meetingRooms,
       occurrences,
       companies,
       members,
+      coffeePlanId,
     );
+  };
+
+  // The id of the "Coffee/Tea Service" add-on plan, resolved by name so we don't
+  // hardcode a database id. Cached (static catalog, ~80 plans / 2 pages).
+  private getCoffeePlanId = async (): Promise<string | null> => {
+    try {
+      const plans = await this.getPlans();
+      const coffee = plans.find((plan) =>
+        COFFEE_PLAN_NAME_PATTERN.test(plan.name ?? ''),
+      );
+      return coffee?._id ?? null;
+    } catch {
+      // A missing plans scope shouldn't break the whole display — just skip the
+      // coffee indicator.
+      return null;
+    }
+  };
+
+  private getPlans = async (): Promise<OfficeRnDPlan[]> => {
+    const results: OfficeRnDPlan[] = [];
+    let cursor: string | undefined;
+    do {
+      const qs = `$limit=50` + (cursor ? `&$cursorNext=${encodeURIComponent(cursor)}` : '');
+      const data = await this.fetchWithTokenAndCache<V2ListResponse<OfficeRnDPlan>>(
+        `${this.BASE_API_URL}/plans?${qs}`,
+      );
+      results.push(...data.results);
+      cursor = data.cursorNext;
+    } while (cursor);
+    return results;
   };
 
   private getMeetingRooms = async () => {

@@ -16,6 +16,9 @@ export type OfficeRnDBooking = {
   recurrence?: { rrule: string | null } | null;
   seriesStart?: string;
   seriesEnd?: string;
+  // Add-on services attached to the booking (coffee, AV, etc.). Each `_id`
+  // references a plan of type "service"; `count` is the quantity.
+  extras?: { _id: string; count: number }[];
 };
 
 export type AppBooking = {
@@ -27,5 +30,6 @@ export type AppBooking = {
   floor: string;
   summary: string;
   host: string;
+  hasCoffee: boolean;
 };
 

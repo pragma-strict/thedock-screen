@@ -27,6 +27,11 @@ export default function Event({
       <div className='eventDetails'>
         <div className='eventRoomAndTime'>
           <span className='eventOrg' style={{ color: colors.accent }}>{orgLabel}</span>
+          {event.hasCoffee ? (
+            <span className='eventCoffee' role='img' aria-label='Coffee service'>
+              ☕
+            </span>
+          ) : null}
           <EventTimeComponent
             start={new Date(event.startDateTime)}
             end={new Date(event.endDateTime)}

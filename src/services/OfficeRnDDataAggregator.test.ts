@@ -30,6 +30,7 @@ test('combineOfficeRnDDataIntoAppBookings combines a set of single entry data it
       }],
       [{_id: "2", name: "Test Company"}],
       [],
+      null,
     )
   ).toStrictEqual(
     [{
@@ -41,6 +42,7 @@ test('combineOfficeRnDDataIntoAppBookings combines a set of single entry data it
       floor: "Test Floor",
       summary: "",
       host: "Test Company",
+      hasCoffee: false,
     }]
   )
 })
@@ -63,6 +65,7 @@ test('combineOfficeRnDDataIntoAppBookings uses member name as host when no compa
       }],
       [],
       [{_id: "0", name: "Test Member"}],
+      null,
     )
   ).toStrictEqual(
     [{
@@ -74,6 +77,7 @@ test('combineOfficeRnDDataIntoAppBookings uses member name as host when no compa
       floor: '',
       summary: "",
       host: "Test Member",
+      hasCoffee: false,
     }]
   )
 })
