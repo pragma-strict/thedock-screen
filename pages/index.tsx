@@ -84,7 +84,7 @@ export default function Home() {
   // whatever is actually happening. Adding a section is just another entry here.
   const sections = [
     {
-      title: 'Happening right now',
+      title: 'Now',
       events: sortEventsByProximityToNow(started),
       // Render these events as a live countdown of remaining time.
       now: currentTime,
