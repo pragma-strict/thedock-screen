@@ -25,6 +25,8 @@ Copy `.env.template` to `.env` and fill in the OfficeRnD OAuth2 credentials:
 
 In production these are set in the Railway project settings.
 
+`DEFAULT_SCOPE` includes `flex.billing.plans.read`, used to identify the coffee add-on service (see [Coffee service add-on](#coffee-service-add-on)). The OAuth client must be granted that scope in OfficeRnD, and if `OFFICERND_SCOPE` is set explicitly it must include it too — otherwise the coffee indicator is silently skipped.
+
 ## Architecture
 
 ### Data Flow
@@ -37,8 +39,9 @@ In production these are set in the Railway project settings.
 
 ### Key Types
 
-- `OfficeRndBooking` — raw API booking shape (`src/services/OfficeRnDTypes/Booking.ts`)
-- `AppBooking` — frontend-facing booking with resolved room/floor/host names
+- `OfficeRndBooking` — raw API booking shape (`src/services/OfficeRnDTypes/Booking.ts`); includes `extras: [{ _id, count }]` for add-on services
+- `AppBooking` — frontend-facing booking with resolved room/floor/host names, plus `coffeeCount` (see [Coffee service add-on](#coffee-service-add-on))
+- `OfficeRnDPlan` — a plan/membership/service (`src/services/OfficeRnDTypes/Plan.ts`); used to resolve the coffee service by name
 
 ### Timezone Handling
 
@@ -51,3 +54,11 @@ The OfficeRnD v2 `bookings` endpoint can only be filtered by `seriesStart`/`seri
 Expansion runs in the booking's **own timezone** (the "floating" technique: feed the rule wall-clock times as if UTC, then reinterpret in the zone). OfficeRnD specifies the rule in local time, so this is required for correctness — otherwise an evening booking (whose UTC instant is on the next calendar day) would recur on the wrong weekday, and DST-crossing series would drift by an hour.
 
 Known caveat (acceptable for a lobby display): a single cancelled occurrence within a series isn't represented by the API in a way we detect, so it could still be shown.
+
+### Coffee service add-on
+
+Bookings can have add-on services attached, carried on the raw booking as `extras: [{ _id, count }]`. Each `_id` references an OfficeRnD **plan of `type: "service"`** (not a fee, resource, or rate — those were dead ends); `count` is the quantity, which for the coffee service is the number of people it's for (the plan is "Coffee/Tea Service, per person").
+
+To avoid hardcoding a database id, `OfficeRnDService.getCoffeePlanId` resolves the coffee plan **by name** (first plan matching `/coffee/i`) from the cached `/plans` list (~80 plans, paged 50 at a time; same 3-day cache as other static data). This requires the `flex.billing.plans.read` scope. If the scope is missing or the lookup fails, it returns `null` and the coffee indicator is simply omitted rather than breaking the display.
+
+`OfficeRnDDataAggregator` matches each booking's `extras` against the resolved coffee plan id and sets `AppBooking.coffeeCount` (0 when no coffee). `extras` survives recurring-occurrence expansion via the `{ ...booking }` spread in `expandRecurringBookings`. The frontend (`src/components/event.tsx`) renders `☕ x{count}` on the card when `coffeeCount > 0`.
