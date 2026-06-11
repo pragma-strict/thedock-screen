@@ -2,9 +2,9 @@ import { COLOR_USAGES } from '../constant/COLOR_USAGES';
 import { AppBooking } from '../services/OfficeRnDTypes/Booking';
 import React, { useEffect, useRef } from 'react';
 
-export default function Event({ event, now }: { event: AppBooking; now?: Date }) {
+export default function Event({ event, now }: { event: AppBooking; now?: Date; }) {
   const style = getEventStyle(event);
-  const messageRef = useRef<null|HTMLDivElement>(null);
+  const messageRef = useRef<null | HTMLDivElement>(null);
 
   const dataToShow = event.summary
     ? {
@@ -61,8 +61,7 @@ function EventTimeComponent({ start, end, now }: { start: Date; end: Date; now?:
 }
 
 // More than an hour left reads as an end time ("Until 3:00 PM"); the final
-// stretch counts down ("45 mins remaining") to draw attention to rooms freeing
-// up soon.
+// stretch counts down ("45 mins") to draw attention to rooms freeing up soon.
 const formatRemaining = (end: Date, now: Date) => {
   const minutesLeft = Math.ceil((end.valueOf() - now.valueOf()) / (1000 * 60));
   if (minutesLeft >= 60) {
@@ -71,7 +70,7 @@ const formatRemaining = (end: Date, now: Date) => {
   const mins = Math.max(minutesLeft, 1);
   return (
     <span className='noWrap'>
-      {mins} {mins === 1 ? 'min' : 'mins'} remaining
+      For {mins} {mins === 1 ? 'min' : 'mins'}
     </span>
   );
 };
