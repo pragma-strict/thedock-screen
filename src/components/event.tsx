@@ -14,12 +14,13 @@ export default function Event({
   const colors = getFloorColors(event);
   const messageRef = useRef<null | HTMLDivElement>(null);
 
-  // Organization sits top-left; the meeting summary is the title. When there's
-  // no summary, the org becomes the title instead (and is dropped from top-left
-  // so it isn't shown twice). The room — plus the floor when off-screen — sits
-  // bottom-right, e.g. "Boardroom" or "3rd Floor · Boardroom".
-  const title = event.summary || event.host;
-  const orgLabel = event.summary ? event.host : '';
+  // Organization sits top-left in all cases; the meeting summary is the title.
+  // When there's no summary, the title falls back to "<org> Meeting" so the
+  // title slot isn't left empty (the org still shows top-left as usual). The
+  // room — plus the floor when off-screen — sits bottom-right, e.g. "Boardroom"
+  // or "3rd Floor · Boardroom".
+  const title = event.summary || (event.host ? `${event.host} Meeting` : '');
+  const orgLabel = event.host;
   const floorLabel = offScreenFloorLabel(event.floor, screenFloor);
 
   return (
