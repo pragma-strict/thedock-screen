@@ -80,11 +80,17 @@ a {
   align-items: flex-start;
   align-self: stretch;
   min-height: 100%;
-  flex: 1.5 0 0;
+  /* Wider than the right section so the event cards (plus their overhanging
+     coffee badge) get more horizontal room, extending further toward the
+     right of the screen. */
+  flex: 2.2 0 0;
   overflow: scroll;
-  /* Narrower horizontal padding than the default 3rem to give the events a
-     couple extra rem of width; vertical stays 3rem to keep the top spacing. */
-  padding: 3rem 2rem;
+  /* Asymmetric horizontal padding: a narrow 2rem on the left gives the events
+     extra width and keeps them flush-left, while a wider 4rem on the right
+     leaves a gutter for the coffee badge to overhang into. The badge must stay
+     within this padding (the scroll border box) or it'd be clipped / trigger a
+     horizontal scrollbar. Vertical stays 3rem to keep the top spacing. */
+  padding: 3rem 4rem 3rem 2rem;
   /* Fixed gap between visible sections. Sections size to their content (no
      flex-grow), so this is the same regardless of how many events each holds
      or which sections are hidden. */
@@ -131,6 +137,10 @@ a {
   padding: 0.5rem 1.4rem;
   display: flex;
   flex-direction: column;
+  /* Positioning context for the coffee badge, which sits just outside the
+     top-right corner. The list section's ~2rem right padding gives the badge
+     room to overhang without being clipped or causing horizontal scroll. */
+  position: relative;
 }
 
 .eventDetails {
@@ -167,10 +177,36 @@ a {
   gap: 1rem;
 }
 
-.eventCoffee {
-  flex-shrink: 0;
-  font-size: 1.15rem;
+/* Coffee badge: sits just outside the card's right edge, vertically centered,
+   so it never overlaps the card's content. Background/text colors are set
+   inline per event — the dark floor color as the fill with the card's accent
+   tint for the icon/number, so the badge matches the event it belongs to. The
+   card's section has a wider right padding to give this badge room to overhang
+   without clipping. */
+.eventCoffeeBadge {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  margin-left: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.32rem 0.5rem;
+  border-radius: 999px;
   line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.eventCoffeeIcon {
+  width: 1.1rem;
+  height: 1.1rem;
+  display: block;
+}
+
+.eventCoffeeCount {
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .eventOrg {

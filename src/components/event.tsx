@@ -1,6 +1,7 @@
 import { COLOR_USAGES } from '../constant/COLOR_USAGES';
 import { AppBooking } from '../services/OfficeRnDTypes/Booking';
 import React, { useEffect, useRef } from 'react';
+import CoffeeIcon from './CoffeeIcon';
 
 export default function Event({
   event,
@@ -25,18 +26,22 @@ export default function Event({
 
   return (
     <div ref={messageRef} className='event' style={{ backgroundColor: colors.background }}>
+      {event.coffeeCount > 0 ? (
+        <div
+          className='eventCoffeeBadge'
+          role='img'
+          aria-label={`Coffee service for ${event.coffeeCount}`}
+          style={{ backgroundColor: colors.background, color: "#fff" }}
+        >
+          <CoffeeIcon className='eventCoffeeIcon' />
+          {event.coffeeCount > 1 ? (
+            <span className='eventCoffeeCount'>{event.coffeeCount}</span>
+          ) : null}
+        </div>
+      ) : null}
       <div className='eventDetails'>
         <div className='eventRoomAndTime'>
           <span className='eventOrg' style={{ color: colors.accent }}>{orgLabel}</span>
-          {event.coffeeCount > 0 ? (
-            <span
-              className='eventCoffee'
-              role='img'
-              aria-label={`Coffee service for ${event.coffeeCount}`}
-            >
-              ☕ x{event.coffeeCount}
-            </span>
-          ) : null}
           <EventTimeComponent
             start={new Date(event.startDateTime)}
             end={new Date(event.endDateTime)}
