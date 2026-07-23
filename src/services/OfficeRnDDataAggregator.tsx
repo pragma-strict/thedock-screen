@@ -3,6 +3,7 @@ import { OfficeRnDCompany } from "./OfficeRnDTypes/Company";
 import { OfficeRnDMeetingRoom } from "./OfficeRnDTypes/MeetingRoom";
 import { OfficeRnDFloor } from "./OfficeRnDTypes/Floor";
 import { keyBy } from "../helpers/keyBy";
+import { stripRoomNameSuffix } from "../helpers/stripRoomNameSuffix";
 import { OfficeRnDMember } from "./OfficeRnDTypes/Member";
 
 export class OfficeRnDDataAggregator {
@@ -30,7 +31,7 @@ export class OfficeRnDDataAggregator {
         endDateTime: event.end,
         startDateTime: event.start,
         timezone: event.timezone,
-        room: meetingRoom?.name || '',
+        room: meetingRoom ? stripRoomNameSuffix(meetingRoom.name) : '',
         floor: meetingRoom?.floor || '',
         host: company?.name || member?.name || '',
         coffeeCount: coffeePlanId
