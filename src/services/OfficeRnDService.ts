@@ -24,6 +24,9 @@ const DEFAULT_SCOPE = [
 // Booking extras reference a plan named like this when coffee is included.
 const COFFEE_PLAN_NAME_PATTERN = /coffee/i;
 
+// ...and like this when the Owl Meeting Pro add-on is included.
+const OWL_PLAN_NAME_PATTERN = /owl/i;
+
 // v2 list endpoints wrap results in { results: T[] }
 type V2ListResponse<T> = {
   results: T[];
@@ -144,6 +147,7 @@ export class OfficeRnDService {
     const companies = await this.getCompanies(events);
     const members = await this.getMembers(events);
     const coffeePlanId = await this.getCoffeePlanId();
+    const owlPlanId = await this.getOwlPlanId();
     return this.aggregator.combineOfficeRnDDataIntoAppBookings(
       floors,
       meetingRooms,
@@ -151,21 +155,29 @@ export class OfficeRnDService {
       companies,
       members,
       coffeePlanId,
+      owlPlanId,
     );
   };
 
-  // The id of the "Coffee/Tea Service" add-on plan, resolved by name so we don't
-  // hardcode a database id. Cached (static catalog, ~80 plans / 2 pages).
-  private getCoffeePlanId = async (): Promise<string | null> => {
+  // The id of the "Coffee/Tea Service" add-on plan.
+  private getCoffeePlanId = () =>
+    this.resolveServicePlanId(COFFEE_PLAN_NAME_PATTERN);
+
+  // The id of the "Owl Meeting Pro" add-on plan.
+  private getOwlPlanId = () => this.resolveServicePlanId(OWL_PLAN_NAME_PATTERN);
+
+  // Resolves an add-on plan's id by matching its name, so we don't hardcode
+  // database ids. Reads the cached plans catalog (static, ~80 plans / 2 pages).
+  // Returns null — and the indicator is simply skipped — if the plans scope is
+  // missing or the lookup fails, rather than breaking the whole display.
+  private resolveServicePlanId = async (
+    namePattern: RegExp,
+  ): Promise<string | null> => {
     try {
       const plans = await this.getPlans();
-      const coffee = plans.find((plan) =>
-        COFFEE_PLAN_NAME_PATTERN.test(plan.name ?? ''),
-      );
-      return coffee?._id ?? null;
+      const plan = plans.find((plan) => namePattern.test(plan.name ?? ''));
+      return plan?._id ?? null;
     } catch {
-      // A missing plans scope shouldn't break the whole display — just skip the
-      // coffee indicator.
       return null;
     }
   };

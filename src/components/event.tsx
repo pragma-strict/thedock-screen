@@ -2,6 +2,7 @@ import { COLOR_USAGES } from '../constant/COLOR_USAGES';
 import { AppBooking } from '../services/OfficeRnDTypes/Booking';
 import React, { useEffect, useRef } from 'react';
 import CoffeeIcon from './CoffeeIcon';
+import OwlIcon from './OwlIcon';
 
 export default function Event({
   event,
@@ -26,16 +27,30 @@ export default function Event({
 
   return (
     <div ref={messageRef} className='event' style={{ backgroundColor: colors.background }}>
-      {event.coffeeCount > 0 ? (
-        <div
-          className='eventCoffeeBadge'
-          role='img'
-          aria-label={`Coffee service for ${event.coffeeCount}`}
-          style={{ backgroundColor: colors.background, color: "#fff" }}
-        >
-          <CoffeeIcon className='eventCoffeeIcon' />
-          {event.coffeeCount > 1 ? (
-            <span className='eventCoffeeCount'>{event.coffeeCount}</span>
+      {event.coffeeCount > 0 || event.hasOwl ? (
+        <div className='eventBadges'>
+          {event.coffeeCount > 0 ? (
+            <div
+              className='eventBadge'
+              role='img'
+              aria-label={`Coffee service for ${event.coffeeCount}`}
+              style={{ backgroundColor: colors.background, color: "#fff" }}
+            >
+              <CoffeeIcon className='eventBadgeIcon' />
+              {event.coffeeCount > 1 ? (
+                <span className='eventBadgeCount'>{event.coffeeCount}</span>
+              ) : null}
+            </div>
+          ) : null}
+          {event.hasOwl ? (
+            <div
+              className='eventBadge'
+              role='img'
+              aria-label='Owl Meeting Pro'
+              style={{ backgroundColor: colors.background, color: "#fff" }}
+            >
+              <OwlIcon className='eventBadgeIcon' />
+            </div>
           ) : null}
         </div>
       ) : null}

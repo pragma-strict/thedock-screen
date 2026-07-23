@@ -43,6 +43,7 @@ test('combineOfficeRnDDataIntoAppBookings combines a set of single entry data it
       summary: "",
       host: "Test Company",
       coffeeCount: 0,
+      hasOwl: false,
     }]
   )
 })
@@ -78,6 +79,7 @@ test('combineOfficeRnDDataIntoAppBookings uses member name as host when no compa
       summary: "",
       host: "Test Member",
       coffeeCount: 0,
+      hasOwl: false,
     }]
   )
 })

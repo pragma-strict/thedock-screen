@@ -40,7 +40,7 @@ In production these are set in the Railway project settings.
 ### Key Types
 
 - `OfficeRndBooking` — raw API booking shape (`src/services/OfficeRnDTypes/Booking.ts`); includes `extras: [{ _id, count }]` for add-on services
-- `AppBooking` — frontend-facing booking with resolved room/floor/host names, plus `coffeeCount` (see [Coffee service add-on](#coffee-service-add-on))
+- `AppBooking` — frontend-facing booking with resolved room/floor/host names, plus `coffeeCount` and `hasOwl` (see [Coffee service add-on](#coffee-service-add-on))
 - `OfficeRnDPlan` — a plan/membership/service (`src/services/OfficeRnDTypes/Plan.ts`); used to resolve the coffee service by name
 
 ### Timezone Handling
@@ -62,3 +62,5 @@ Bookings can have add-on services attached, carried on the raw booking as `extra
 To avoid hardcoding a database id, `OfficeRnDService.getCoffeePlanId` resolves the coffee plan **by name** (first plan matching `/coffee/i`) from the cached `/plans` list (~80 plans, paged 50 at a time; same 3-day cache as other static data). This requires the `flex.billing.plans.read` scope. If the scope is missing or the lookup fails, it returns `null` and the coffee indicator is simply omitted rather than breaking the display.
 
 `OfficeRnDDataAggregator` matches each booking's `extras` against the resolved coffee plan id and sets `AppBooking.coffeeCount` (0 when no coffee). `extras` survives recurring-occurrence expansion via the `{ ...booking }` spread in `expandRecurringBookings`. The frontend (`src/components/event.tsx`) renders `☕ x{count}` on the card when `coffeeCount > 0`.
+
+The **Owl Meeting Pro** add-on works the same way. Its plan id is resolved by name (`/owl/i`) via the shared `OfficeRnDService.resolveServicePlanId` helper (which also backs `getCoffeePlanId`), the aggregator sets `AppBooking.hasOwl` when a booking's `extras` include it, and the frontend renders an owl pill (`OwlIcon`, no count — it's a presence indicator). The coffee and owl pills share `.eventBadge` styling and stack vertically in an `.eventBadges` container when a booking has both.
