@@ -141,12 +141,13 @@ const formatTime = (date: Date | number) => {
 const meridiemOf = (time: string) => time.match(/(AM|PM)$/i)?.[0];
 const stripMeridiem = (time: string) => time.replace(/\s*(AM|PM)$/i, '');
 
-// Card background + matching accent (a lighter tint) for an event's floor.
-// Defaults to Floor 1's colors when the floor is missing or unrecognized.
+// Card background (the floor's primary tone) + matching accent (its lighter
+// tint) for an event's floor. Defaults to Floor 1's colors when the floor is
+// missing or unrecognized.
 const getFloorColors = (event: AppBooking) => {
   if (floorNumberOf(event.floor) === 3) {
-    return { background: COLOR_USAGES.FLOOR_3, accent: COLOR_USAGES.FLOOR_3_ALT };
+    return { background: COLOR_USAGES.FLOOR_3_PRIMARY, accent: COLOR_USAGES.FLOOR_3_LIGHT };
   }
-  return { background: COLOR_USAGES.FLOOR_1, accent: COLOR_USAGES.FLOOR_1_ALT };
+  return { background: COLOR_USAGES.FLOOR_1_PRIMARY, accent: COLOR_USAGES.FLOOR_1_LIGHT };
 };
 
