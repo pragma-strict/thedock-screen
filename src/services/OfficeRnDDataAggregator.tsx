@@ -14,6 +14,7 @@ export class OfficeRnDDataAggregator {
     companies: OfficeRnDCompany[],
     members: OfficeRnDMember[],
     coffeePlanId: string | null = null,
+    owlPlanId: string | null = null,
   ): AppBooking[] => {
     const floorsById = keyBy(floors, '_id');
     const companiesById = keyBy(companies, '_id');
@@ -38,6 +39,9 @@ export class OfficeRnDDataAggregator {
           ? (event.extras ?? []).find((extra) => extra._id === coffeePlanId)
               ?.count ?? 0
           : 0,
+        hasOwl: owlPlanId
+          ? (event.extras ?? []).some((extra) => extra._id === owlPlanId)
+          : false,
       } as AppBooking;
     });
     return eventsWithMeetingRooms;

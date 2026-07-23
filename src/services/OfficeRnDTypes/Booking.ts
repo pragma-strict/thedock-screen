@@ -32,5 +32,7 @@ export type AppBooking = {
   host: string;
   // Number of people the coffee service is attached for; 0 when no coffee.
   coffeeCount: number;
+  // Whether the Owl Meeting Pro add-on is included on the booking.
+  hasOwl: boolean;
 };
 

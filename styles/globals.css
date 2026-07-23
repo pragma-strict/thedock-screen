@@ -177,18 +177,27 @@ a {
   gap: 1rem;
 }
 
-/* Coffee badge: sits just outside the card's right edge, vertically centered,
-   so it never overlaps the card's content. Background/text colors are set
-   inline per event — the dark floor color as the fill with the card's accent
-   tint for the icon/number, so the badge matches the event it belongs to. The
-   card's section has a wider right padding to give this badge room to overhang
-   without clipping. */
-.eventCoffeeBadge {
+/* Booking badges: the pill indicators (coffee service, Owl Meeting Pro, …) that
+   sit just outside the card's right edge, vertically centered, and stack when a
+   booking has more than one. The card's section has a wider right padding to
+   give them room to overhang without being clipped or causing horizontal
+   scroll. */
+.eventBadges {
   position: absolute;
   top: 50%;
   left: 100%;
   transform: translateY(-50%);
   margin-left: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+/* A single pill. Background/text colors are set inline per event — the dark
+   floor color as the fill with white for the icon/number — so the badge matches
+   the event it belongs to. */
+.eventBadge {
   display: flex;
   align-items: center;
   gap: 0.2rem;
@@ -198,13 +207,13 @@ a {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
-.eventCoffeeIcon {
+.eventBadgeIcon {
   width: 1.1rem;
   height: 1.1rem;
   display: block;
 }
 
-.eventCoffeeCount {
+.eventBadgeCount {
   font-size: 0.9rem;
   font-weight: 700;
 }

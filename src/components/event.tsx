@@ -2,6 +2,7 @@ import { COLOR_USAGES } from '../constant/COLOR_USAGES';
 import { AppBooking } from '../services/OfficeRnDTypes/Booking';
 import React, { useEffect, useRef } from 'react';
 import CoffeeIcon from './CoffeeIcon';
+import OwlIcon from './OwlIcon';
 
 export default function Event({
   event,
@@ -26,16 +27,30 @@ export default function Event({
 
   return (
     <div ref={messageRef} className='event' style={{ backgroundColor: colors.background }}>
-      {event.coffeeCount > 0 ? (
-        <div
-          className='eventCoffeeBadge'
-          role='img'
-          aria-label={`Coffee service for ${event.coffeeCount}`}
-          style={{ backgroundColor: colors.background, color: "#fff" }}
-        >
-          <CoffeeIcon className='eventCoffeeIcon' />
-          {event.coffeeCount > 1 ? (
-            <span className='eventCoffeeCount'>{event.coffeeCount}</span>
+      {event.coffeeCount > 0 || event.hasOwl ? (
+        <div className='eventBadges'>
+          {event.coffeeCount > 0 ? (
+            <div
+              className='eventBadge'
+              role='img'
+              aria-label={`Coffee service for ${event.coffeeCount}`}
+              style={{ backgroundColor: colors.background, color: "#fff" }}
+            >
+              <CoffeeIcon className='eventBadgeIcon' />
+              {event.coffeeCount > 1 ? (
+                <span className='eventBadgeCount'>{event.coffeeCount}</span>
+              ) : null}
+            </div>
+          ) : null}
+          {event.hasOwl ? (
+            <div
+              className='eventBadge'
+              role='img'
+              aria-label='Owl Meeting Pro'
+              style={{ backgroundColor: colors.background, color: "#fff" }}
+            >
+              <OwlIcon className='eventBadgeIcon' />
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -141,12 +156,13 @@ const formatTime = (date: Date | number) => {
 const meridiemOf = (time: string) => time.match(/(AM|PM)$/i)?.[0];
 const stripMeridiem = (time: string) => time.replace(/\s*(AM|PM)$/i, '');
 
-// Card background + matching accent (a lighter tint) for an event's floor.
-// Defaults to Floor 1's colors when the floor is missing or unrecognized.
+// Card background (the floor's primary tone) + matching accent (its lighter
+// tint) for an event's floor. Defaults to Floor 1's colors when the floor is
+// missing or unrecognized.
 const getFloorColors = (event: AppBooking) => {
   if (floorNumberOf(event.floor) === 3) {
-    return { background: COLOR_USAGES.FLOOR_3, accent: COLOR_USAGES.FLOOR_3_ALT };
+    return { background: COLOR_USAGES.FLOOR_3_PRIMARY, accent: COLOR_USAGES.FLOOR_3_LIGHT };
   }
-  return { background: COLOR_USAGES.FLOOR_1, accent: COLOR_USAGES.FLOOR_1_ALT };
+  return { background: COLOR_USAGES.FLOOR_1_PRIMARY, accent: COLOR_USAGES.FLOOR_1_LIGHT };
 };
 
