@@ -20,6 +20,11 @@
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+  /* Lobby display: no one is meant to interact with the screen, so hide the
+     mouse cursor entirely. Keeps a stray cursor left mid-screen from looking
+     unprofessional. `!important` beats the per-element defaults (links,
+     scrollable areas) that would otherwise show their own cursor. */
+  cursor: none !important;
 }
 
 html,
