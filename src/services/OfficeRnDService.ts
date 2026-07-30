@@ -10,6 +10,56 @@ import { OfficeRnDPlan } from './OfficeRnDTypes/Plan';
 const ONE_DAY_IN_MS = 1000 * 60 * 60 * 24; // 1 day
 const DEFAULT_CACHE_TIME_IN_MS = 3 * ONE_DAY_IN_MS; // 3 days
 
+// Rate-limit handling: OfficeRnD returns 429 when we fan out too many requests
+// at once. We cap how many per-booking lookups (members/companies) run
+// concurrently, and retry any 429 a few times with backoff.
+const MEMBER_COMPANY_CONCURRENCY = 5;
+// OfficeRnD's `$in` filter accepts at most 50 values per request.
+const MAX_IN_FILTER_VALUES = 50;
+const MAX_RATE_LIMIT_RETRIES = 3;
+const RATE_LIMIT_BACKOFF_MS = 1000;
+
+// OAuth token lifetime handling for the reused service instance. Refresh a
+// little before the token actually expires; if the grant response omits
+// `expires_in`, assume a conservative lifetime.
+const DEFAULT_TOKEN_LIFETIME_SECONDS = 3600;
+const TOKEN_REFRESH_SKEW_SECONDS = 60;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Distinct, non-empty values, preserving first-seen order.
+const uniqueTruthy = <T>(values: (T | null | undefined)[]): T[] =>
+  Array.from(new Set(values.filter((value): value is T => Boolean(value))));
+
+// Split an array into consecutive chunks of at most `size` elements.
+const chunk = <T>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+// Run `task` over `items` with at most `limit` in flight at a time, returning
+// results in input order (like Promise.all, but bounded).
+const mapWithConcurrency = async <T, R>(
+  items: T[],
+  task: (item: T) => Promise<R>,
+  limit = MEMBER_COMPANY_CONCURRENCY,
+): Promise<R[]> => {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await task(items[index]);
+    }
+  };
+  const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+  await Promise.all(workers);
+  return results;
+};
+
 const DEFAULT_SCOPE = [
   'flex.space.bookings.read',
   'flex.space.resources.read',
@@ -39,11 +89,15 @@ type V2ListResponse<T> = {
 export class OfficeRnDService {
   BASE_API_URL = 'https://app.officernd.com/api/v2/organizations/thedock';
   access_token = '';
+  // Epoch ms at which the cached token should be considered expired. The service
+  // is reused across requests, so a token can't live forever — we refresh it
+  // once it (nearly) expires, based on the grant's `expires_in`.
+  private tokenExpiresAt = 0;
 
   aggregator = new OfficeRnDDataAggregator();
 
   private authenticate = async () => {
-    if (this.access_token) {
+    if (this.access_token && Date.now() < this.tokenExpiresAt) {
       return this.access_token;
     }
     const response = await fetch(
@@ -54,12 +108,23 @@ export class OfficeRnDService {
       const body = await response.text();
       throw new Error(`OfficeRnD auth failed (${response.status}): ${body}`);
     }
-    const data: { access_token: string } = await response.json();
+    const data: { access_token: string; expires_in?: number } =
+      await response.json();
     this.access_token = data.access_token;
+    // Refresh a bit before the real expiry to avoid using a just-expired token;
+    // fall back to a conservative lifetime if the grant omits `expires_in`.
+    const lifetimeSeconds = data.expires_in ?? DEFAULT_TOKEN_LIFETIME_SECONDS;
+    this.tokenExpiresAt =
+      Date.now() + Math.max(0, lifetimeSeconds - TOKEN_REFRESH_SKEW_SECONDS) * 1000;
     return this.access_token;
   };
 
-  private fetchWithToken = async <T extends {}>(url: string) => {
+  // Retry a rate-limited (429) request a few times, honouring the server's
+  // `Retry-After` header when present and otherwise backing off linearly.
+  private fetchWithToken = async <T extends {}>(
+    url: string,
+    retriesLeft = MAX_RATE_LIMIT_RETRIES,
+  ): Promise<T> => {
     const token = await this.authenticate();
     const response = await fetch(url, {
       method: 'GET',
@@ -67,6 +132,16 @@ export class OfficeRnDService {
         Authorization: 'Bearer ' + token,
       },
     });
+    if (response.status === 429 && retriesLeft > 0) {
+      const attempt = MAX_RATE_LIMIT_RETRIES - retriesLeft + 1;
+      const retryAfterSeconds = Number(response.headers.get('Retry-After'));
+      const delayMs =
+        Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+          ? retryAfterSeconds * 1000
+          : attempt * RATE_LIMIT_BACKOFF_MS;
+      await sleep(delayMs);
+      return this.fetchWithToken<T>(url, retriesLeft - 1);
+    }
     if (!response.ok) {
       throw new Error(
         `OfficeRnD API error (${response.status}): ${response.statusText} — ${url}`
@@ -211,35 +286,33 @@ export class OfficeRnDService {
   };
 
   private getCompanies = async (bookings: OfficeRnDBooking[]) => {
-    const companyPromises = bookings
-      .filter((booking) => booking.company)
-      .map<Promise<OfficeRnDCompany>>((booking) => {
-        return this.getCompany(booking);
-      });
-    return Promise.all(companyPromises);
-  };
-
-  private getCompany = (booking: OfficeRnDBooking) => {
-    return this.fetchWithTokenAndCache<OfficeRnDCompany>(
-      `${this.BASE_API_URL}/companies/${booking.company}`,
-    );
+    const companyIds = uniqueTruthy(bookings.map((booking) => booking.company));
+    return this.fetchByIds<OfficeRnDCompany>('companies', companyIds);
   };
 
   private getMembers = async (bookings: OfficeRnDBooking[]) => {
-    const memberPromises = bookings
-      .filter((booking) => booking.member)
-      .map<Promise<OfficeRnDMember>>((booking) => {
-        return this.getMember(booking);
-      });
-    return Promise.all(memberPromises);
+    const memberIds = uniqueTruthy(bookings.map((booking) => booking.member));
+    return this.fetchByIds<OfficeRnDMember>('members', memberIds);
   };
 
-  private getMember = async (
-    booking: OfficeRnDBooking,
-  ): Promise<OfficeRnDMember> => {
-    return this.fetchWithTokenAndCache<OfficeRnDMember>(
-      `${this.BASE_API_URL}/members/${booking.member}`,
-    );
+  // Fetch many records by id in as few requests as possible: one list query per
+  // batch of up to 50 ids via the `_id[$in]` filter, instead of one request per
+  // id. This is what keeps us under OfficeRnD's rate limit on busy days. Ids are
+  // sorted so the request URL (and thus the cache key) is stable across polls.
+  private fetchByIds = async <T extends {}>(
+    endpoint: string,
+    ids: string[],
+  ): Promise<T[]> => {
+    const batches = chunk([...ids].sort(), MAX_IN_FILTER_VALUES);
+    const pages = await mapWithConcurrency(batches, (batch) => {
+      const qs =
+        `_id[$in]=${encodeURIComponent(batch.join(','))}` +
+        `&$limit=${MAX_IN_FILTER_VALUES}`;
+      return this.fetchWithTokenAndCache<V2ListResponse<T>>(
+        `${this.BASE_API_URL}/${endpoint}?${qs}`,
+      );
+    });
+    return pages.flatMap((page) => page.results);
   };
 }
 

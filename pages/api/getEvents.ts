@@ -8,6 +8,12 @@ import { OfficeRnDService } from '../../src/services/OfficeRnDService';
 
 const TIMEZONE = 'America/Vancouver';
 
+// Reuse one service instance across requests so its OAuth token and 3-day cache
+// (rooms, floors, plans, members, companies) persist between polls. A fresh
+// instance per request would re-authenticate and re-fetch everything every 4
+// minutes, multiplying API calls and inviting rate limiting (429).
+const officeRNDService = new OfficeRnDService();
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -19,7 +25,6 @@ export default async function handler(
   const startOfToday = DateTime.now().setZone(TIMEZONE).startOf('day');
   const endOfWindow = startOfToday.plus({ days: 2 }); // exclusive: start of day after tomorrow
 
-  const officeRNDService = new OfficeRnDService();
   const events = await officeRNDService.getEventsWithMeetingRoomsAndHostingTeam(
     startOfToday.toUTC().toISO()!,
     endOfWindow.toUTC().toISO()!,
