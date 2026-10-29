@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { DateTime } from 'luxon';
 import {
+  RemoveHiddenEvents,
   SeparateTodayAndTomorrowEvents,
   TrimExpiredEvents,
 } from '../../src/misc/dataProcessing/processEvents';
@@ -35,7 +36,10 @@ export default async function handler(
       new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime()
     );
   });
-  const activeEvents = TrimExpiredEvents(todayEventsSorted, new Date());
+  const activeEvents = TrimExpiredEvents(
+    RemoveHiddenEvents(todayEventsSorted),
+    new Date(),
+  );
   // Split today vs. tomorrow here (timezone-sensitive, changes only near
   // midnight). The started/upcoming/finished partition is derived on the client
   // each minute from the current time, so finished events disappear promptly

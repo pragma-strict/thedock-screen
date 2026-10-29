@@ -1,5 +1,6 @@
 import { AppBooking } from '@/src/services/OfficeRnDTypes/Booking';
 import {
+  RemoveHiddenEvents,
   SeparateStartedAndUpcomingEvents,
   SeparateTodayAndTomorrowEvents,
   TrimExpiredEvents,
@@ -51,4 +52,19 @@ test('SeparateTodayAndTomorrowEvents splits by calendar date in the given timezo
     today: [{ startDateTime: '2024-01-11T02:00:00.000Z', endDateTime: '' }],
     tomorrow: [{ startDateTime: '2024-01-11T17:00:00.000Z', endDateTime: '' }],
   });
+});
+
+test('RemoveHiddenEvents drops events titled exactly "Hotdesking"', () => {
+  expect(
+    RemoveHiddenEvents([
+      { summary: 'Hotdesking' },
+      { summary: 'Hotdesking sync' },
+      { summary: 'hotdesking' },
+      { summary: 'Team meeting' },
+    ] as AppBooking[]),
+  ).toStrictEqual([
+    { summary: 'Hotdesking sync' },
+    { summary: 'hotdesking' },
+    { summary: 'Team meeting' },
+  ]);
 });

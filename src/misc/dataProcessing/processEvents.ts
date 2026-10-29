@@ -8,6 +8,13 @@ export function TrimExpiredEvents(events: Array<AppBooking>, dateTimeToCompare: 
     })
 }
 
+// Internal bookings staff don't want shown on the lobby screens.
+const HIDDEN_EVENT_TITLES = ['Hotdesking'];
+
+export function RemoveHiddenEvents(events: Array<AppBooking>) {
+    return events.filter((event) => !HIDDEN_EVENT_TITLES.includes(event.summary));
+}
+
 interface HasStartDateTime {
     startDateTime: string;
 }
