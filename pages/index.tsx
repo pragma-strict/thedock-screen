@@ -44,6 +44,12 @@ export default function Home() {
   // Midnight mode swaps the black background for an animated seascape between
   // 00:00 and 06:00. `?midnight=1` forces it on for previewing during the day.
   const midnightMode = midnight === '1' || isMidnightMode(currentTime);
+  // The seascape's floating 3D logo replaces the flat one once it has loaded;
+  // until then (or if it fails) the flat white logo stays put.
+  const [floatingLogoReady, setFloatingLogoReady] = useState(false);
+  useEffect(() => {
+    if (!midnightMode) setFloatingLogoReady(false);
+  }, [midnightMode]);
 
   // Raw buckets from the API: today's events (regardless of started/finished)
   // and tomorrow's. The started/upcoming/finished split is derived below from
@@ -113,7 +119,9 @@ export default function Home() {
 
   return (
     <div className='event_page'>
-      {midnightMode && <MidnightSeascape />}
+      {midnightMode && (
+        <MidnightSeascape onLogoReady={() => setFloatingLogoReady(true)} />
+      )}
       <div className='child_section left_section no-scrollbar'>
         {sections.map((section) => (
           <Section
@@ -145,7 +153,13 @@ export default function Home() {
           {midnightMode && <span className='midnight-mode-tag'>Midnight mode</span>}
         </div>
         <img
-          className={midnightMode ? 'logo logo--midnight' : 'logo'}
+          className={
+            midnightMode
+              ? floatingLogoReady
+                ? 'logo logo--hidden'
+                : 'logo logo--midnight'
+              : 'logo'
+          }
           src={midnightMode ? 'theDockLogoWhite.png' : 'theDockLogoSquareColors.png'}
         />
       </div>

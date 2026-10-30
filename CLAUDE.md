@@ -67,6 +67,10 @@ The **Owl Meeting Pro** add-on works the same way. Its plan id is resolved by na
 
 ### Midnight mode
 
-From 00:00 to 06:00 (screen-local time) the black background is replaced by an animated three.js seascape (`src/components/MidnightSeascape.tsx`), loaded client-only via `next/dynamic` so three.js is only downloaded when it's needed. The early-2000s look comes from rendering at reduced resolution (`PIXEL_SCALE`) with nearest-neighbour upscaling and 16-bit ordered dithering in the shaders; scene tuning lives in the constants at the top of the file. In midnight mode the page also uses the white logo (dimmed), shows a "Midnight mode" tag under the clock, and renders event cards translucent (`TRANSLUCENT_CARD_ALPHA` in `event.tsx`).
+From 00:00 to 06:00 (screen-local time) the black background is replaced by an animated three.js seascape (`src/components/MidnightSeascape.tsx`), loaded client-only via `next/dynamic` so three.js is only downloaded when it's needed. The early-2000s look comes from rendering at reduced resolution (`PIXEL_SCALE`) with nearest-neighbour upscaling and 16-bit ordered dithering in the shaders; scene tuning lives in the constants at the top of the file. In midnight mode the page also shows a "Midnight mode" tag under the clock and renders event cards translucent (`TRANSLUCENT_CARD_ALPHA` in `event.tsx`).
+
+The wave height field is defined once in `src/components/seascape/waves.ts` (`WAVE_OCTAVES`) and generated into both the water's GLSL and a JavaScript port, so floating objects ride the same waves the shader draws; octaves flagged `pixel` only perturb per-pixel normals (fine chop the mesh can't carry). The water mesh's triangle winding must face up — it's back-face culled.
+
+The bottom-right logo is replaced by a 3D one (`src/components/seascape/floatingLogo.ts`) extruded at runtime from the traced `public/theDockLogoSVG_1.svg` (one slab per fill colour), which bobs on the waves, sits partly submerged, and gets shader froth around its waterline footprint. The flat white logo stays visible until it loads (`onLogoReady`), so a failed load never leaves the corner empty.
 
 Preview query params: `?midnight=1` forces midnight mode on; `?fetchAtNight=1` bypasses the 5am–10pm fetch window so it can be seen with real bookings.

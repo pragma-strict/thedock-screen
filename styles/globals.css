@@ -298,3 +298,9 @@ a {
 .logo--midnight {
   opacity: 0.6;
 }
+
+/* Replaced by the seascape's floating 3D logo. Hidden rather than removed so
+   the right column's layout doesn't shift. */
+.logo--hidden {
+  visibility: hidden;
+}

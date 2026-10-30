@@ -1,5 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { DITHER_GLSL } from './seascape/dither';
+import { FloatingLogo, loadFloatingLogo } from './seascape/floatingLogo';
+import { SIMPLEX_GLSL, WATER_DETAIL_GLSL, WATER_HEIGHT_GLSL } from './seascape/waves';
 
 // Midnight-mode background: a static camera a few meters above an endless,
 // slowly heaving ocean under a star field and a low moon. The look is aimed at
@@ -12,7 +15,7 @@ import * as THREE from 'three';
 // shaders so the whole scene costs a single small draw per object per frame.
 
 // Render resolution divisor. 2 → a 1080p screen renders at 960×540.
-const PIXEL_SCALE = 2;
+const PIXEL_SCALE = 4;
 // The scene moves slowly, so 30fps looks the same and halves the GPU work.
 const FRAME_INTERVAL_MS = 1000 / 30;
 
@@ -41,13 +44,30 @@ const WATER_WIDTH_FACTOR = 1.3;
 
 const FOG_DENSITY = 0.0025;
 
+// Water opacity looking straight down into it; it turns fully opaque toward
+// grazing angles and into the haze. What shows through is the submerged part
+// of the logo, or the sky dome's horizon color where there's nothing below.
+const WATER_OPACITY = 0.3;
+
+// Froth where the floating logo meets the water: strongest at the hull and
+// fading out over FOAM_WIDTH meters, broken up by noise and ripples that
+// drift outward.
+const FOAM_WIDTH = 0.35;
+const FOAM_OPACITY = 0.6;
+
 const COLORS = {
   skyZenith: '#01020a',
   skyHorizon: '#1a2a4a',
   water: '#0b1a30',
+  foam: '#c8d4ea',
   moon: '#e6ebf5',
   moonGlow: '#5d7299',
   star: '#d8e0ff',
+  // Lighting for the floating logo: cool moonlight from behind it, a soft
+  // fill from the viewer's side so its face reads, and a dim ambient.
+  moonlight: '#c8d4f0',
+  fillLight: '#8fa4d0',
+  ambientLight: '#3a4a70',
 };
 
 // Colors are passed to the shaders as raw display values (no linear/sRGB
@@ -70,23 +90,6 @@ const moonDirection = new THREE.Vector3(
   -Math.cos(degToRad(MOON_AZIMUTH)) * Math.cos(degToRad(MOON_ELEVATION)),
 ).normalize();
 
-// 16-bit (RGB565) color quantization with a 4×4 ordered dither, applied at the
-// end of every fragment shader for that period-correct banding.
-const DITHER_GLSL = /* glsl */ `
-  float bayer2(vec2 a) {
-    a = floor(a);
-    return fract(a.x / 2.0 + a.y * a.y * 0.75);
-  }
-  float bayer4(vec2 a) {
-    return bayer2(0.5 * a) * 0.25 + bayer2(a);
-  }
-  vec3 dither565(vec3 color) {
-    vec3 levels = vec3(31.0, 63.0, 31.0);
-    float threshold = bayer4(gl_FragCoord.xy);
-    return floor(clamp(color, 0.0, 1.0) * levels + threshold) / levels;
-  }
-`;
-
 // Shared by water and sky so the water's reflection, fog, and the sky agree.
 const SKY_GLSL = /* glsl */ `
   uniform vec3 uSkyZenith;
@@ -96,60 +99,18 @@ const SKY_GLSL = /* glsl */ `
   }
 `;
 
-// 2D simplex noise — Ashima Arts / Stefan Gustavson (MIT license).
-const SIMPLEX_GLSL = /* glsl */ `
-  vec3 permute(vec3 x) { return mod(((x * 34.0) + 1.0) * x, 289.0); }
-  float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                        -0.577350269189626, 0.024390243902439);
-    vec2 i = floor(v + dot(v, C.yy));
-    vec2 x0 = v - i + dot(i, C.xx);
-    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-    vec4 x12 = x0.xyxy + C.xxzz;
-    x12.xy -= i1;
-    i = mod(i, 289.0);
-    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-    vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
-    m = m * m;
-    m = m * m;
-    vec3 x = 2.0 * fract(p * C.www) - 1.0;
-    vec3 h = abs(x) - 0.5;
-    vec3 ox = floor(x + 0.5);
-    vec3 a0 = x - ox;
-    m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
-    vec3 g;
-    g.x = a0.x * x0.x + h.x * x0.y;
-    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-    return 130.0 * dot(m, g);
-  }
-`;
-
 const WATER_VERTEX = /* glsl */ `
   uniform float uTime;
   varying vec3 vWorldPos;
   varying vec3 vNormal;
-  ${SIMPLEX_GLSL}
-
-  // Three octaves of drifting noise. Each octave fades out with distance
-  // before the mesh gets too coarse to carry it, which keeps the far water
-  // from shimmering.
-  float waterHeight(vec2 p, float dist) {
-    float t = uTime;
-    float h = 0.0;
-    h += 0.60 * snoise(p * 0.06 + vec2(t * 0.025, t * 0.015))
-             * mix(1.0, 0.4, smoothstep(300.0, 900.0, dist));
-    h += 0.30 * snoise(p * 0.15 + vec2(-t * 0.045, t * 0.035))
-             * (1.0 - smoothstep(120.0, 400.0, dist));
-    h += 0.12 * snoise(p * 0.40 + vec2(t * 0.070, -t * 0.055))
-             * (1.0 - smoothstep(40.0, 140.0, dist));
-    return h;
-  }
+  // Height field shared with the floating logo (see seascape/waves.ts).
+  ${WATER_HEIGHT_GLSL}
 
   void main() {
     vec3 p = position;
     float dist = length(p.xz - cameraPosition.xz);
     // Normal from finite differences of the height field.
-    const float e = 0.25;
+    const float e = 0.08;
     float h = waterHeight(p.xz, dist);
     float hx = waterHeight(p.xz + vec2(e, 0.0), dist);
     float hz = waterHeight(p.xz + vec2(0.0, e), dist);
@@ -165,16 +126,60 @@ const WATER_FRAGMENT = /* glsl */ `
   uniform vec3 uMoonColor;
   uniform vec3 uWaterColor;
   uniform float uFogDensity;
+  uniform float uOpacity;
+  uniform float uTime;
+  // The floating logo's waterline footprint: a rectangle on the surface,
+  // given by its center, its local x axis (cos/sin of its turn), and its
+  // half-size. uFoamOpacity is 0 until the logo is in the scene.
+  uniform vec2 uFoamCenter;
+  uniform vec2 uFoamAxis;
+  uniform vec2 uFoamHalfSize;
+  uniform float uFoamWidth;
+  uniform float uFoamOpacity;
+  uniform vec3 uFoamColor;
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   ${SKY_GLSL}
   ${DITHER_GLSL}
+  ${SIMPLEX_GLSL}
+  ${WATER_DETAIL_GLSL}
+
+  // Signed distance (meters) from a surface point to the footprint's edge.
+  float footprintDistance(vec2 p) {
+    vec2 d = p - uFoamCenter;
+    vec2 local = vec2(dot(d, vec2(uFoamAxis.x, -uFoamAxis.y)),
+                      dot(d, vec2(uFoamAxis.y, uFoamAxis.x)));
+    vec2 q = abs(local) - uFoamHalfSize;
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+  }
+
+  float foamAmount(vec2 p) {
+    float d = max(footprintDistance(p), 0.0);
+    float falloff = exp(-d / uFoamWidth);
+    // Rings drifting outward from the hull, broken up by slow noise.
+    float ripple = 0.5 + 0.5 * sin(d * 9.0 - uTime * 1.6);
+    float breakup = 0.5 + 0.5 * snoise(p * 2.2 + vec2(uTime * 0.15, -uTime * 0.1));
+    float froth = falloff * (0.45 + 0.35 * breakup + 0.2 * ripple);
+    return smoothstep(0.5, 0.75, froth) * uFoamOpacity;
+  }
 
   void main() {
-    vec3 n = normalize(vNormal);
     vec3 toCamera = cameraPosition - vWorldPos;
     float dist = length(toCamera);
     vec3 v = toCamera / dist;
+
+    // Fine chop bends the mesh normal per pixel: add the detail octaves'
+    // slope (finite differences) to the mesh surface's slope.
+    vec2 p = vWorldPos.xz;
+    float footprint = max(length(dFdx(p)), length(dFdy(p)));
+    float flatDist = length(p - cameraPosition.xz);
+    const float de = 0.02;
+    float d0 = waterDetail(p, flatDist, footprint);
+    float dhdx = (waterDetail(p + vec2(de, 0.0), flatDist, footprint) - d0) / de;
+    float dhdz = (waterDetail(p + vec2(0.0, de), flatDist, footprint) - d0) / de;
+    vec3 meshNormal = normalize(vNormal);
+    vec3 n = normalize(vec3(meshNormal.x / meshNormal.y - dhdx, 1.0,
+                            meshNormal.z / meshNormal.y - dhdz));
 
     // Silvery look: reflect a brightened version of the sky, weighted by a
     // Fresnel term, over a dim moonlit base.
@@ -183,7 +188,7 @@ const WATER_FRAGMENT = /* glsl */ `
     // reflection varies smoothly across each swell — that's the "plastic".
     vec3 env = mix(uSkyHorizon * 1.8, uSkyZenith + uSkyHorizon * 0.3,
                    smoothstep(-0.1, 0.7, r.y));
-    float fresnel = 0.15 + 0.85 * pow(1.0 - max(dot(n, v), 0.0), 3.0);
+    float fresnel = 0.15 + 0.85 * pow(1.0 - max(dot(n, v), 0.0), 10.0);
     vec3 color = uWaterColor * (0.35 + 0.65 * max(dot(n, uMoonDir), 0.0));
     color = mix(color, env, fresnel);
 
@@ -191,12 +196,20 @@ const WATER_FRAGMENT = /* glsl */ `
     // moon's glitter path.
     vec3 halfway = normalize(uMoonDir + v);
     float nh = max(dot(n, halfway), 0.0);
-    color += uMoonColor * (0.22 * pow(nh, 12.0) + 0.75 * pow(nh, 120.0));
+    float glint = 0.35 * pow(nh, 600.0);
+    color += uMoonColor * (0.12 * pow(nh, 12.0) + glint);
+
+    float foam = foamAmount(vWorldPos.xz);
+    color = mix(color, uFoamColor, foam);
 
     float fog = 1.0 - exp(-pow(uFogDensity * dist, 2.0));
     color = mix(color, skyGradient(0.0), fog);
 
-    gl_FragColor = vec4(dither565(color), 1.0);
+    // See-through when looking down into it; glints, froth and haze stay solid.
+    float alpha = mix(uOpacity, 1.0, fresnel);
+    alpha = max(alpha, max(max(fog, foam), min(glint, 1.0)));
+
+    gl_FragColor = vec4(dither565(color), alpha);
   }
 `;
 
@@ -273,7 +286,9 @@ const buildWaterGeometry = () => {
     for (let col = 0; col < WATER_COLS - 1; col++) {
       const a = row * WATER_COLS + col;
       const b = a + WATER_COLS;
-      indices.push(a, b, a + 1, a + 1, b, b + 1);
+      // Counter-clockwise seen from above, so the surface faces up (row b is
+      // farther from the camera than row a).
+      indices.push(a, a + 1, b, a + 1, b + 1, b);
     }
   }
   const geometry = new THREE.BufferGeometry();
@@ -314,8 +329,15 @@ const buildStarGeometry = () => {
   return geometry;
 };
 
-export default function MidnightSeascape() {
+export default function MidnightSeascape({
+  onLogoReady,
+}: {
+  // Called once the 3D logo is in the scene, so the page can hide its flat one.
+  onLogoReady?: () => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const onLogoReadyRef = useRef(onLogoReady);
+  onLogoReadyRef.current = onLogoReady;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -359,10 +381,18 @@ export default function MidnightSeascape() {
         uTime: time,
         uWaterColor: { value: hexToVec3(COLORS.water) },
         uFogDensity: { value: FOG_DENSITY },
+        uOpacity: { value: WATER_OPACITY },
+        uFoamCenter: { value: new THREE.Vector2() },
+        uFoamAxis: { value: new THREE.Vector2(1, 0) },
+        uFoamHalfSize: { value: new THREE.Vector2() },
+        uFoamWidth: { value: FOAM_WIDTH },
+        uFoamOpacity: { value: 0 },
+        uFoamColor: { value: hexToVec3(COLORS.foam) },
       },
     });
     const water = new THREE.Mesh(waterGeometry, waterMaterial);
     water.frustumCulled = false; // vertices are displaced in the shader
+    waterMaterial.transparent = true;
 
     const skyGeometry = new THREE.SphereGeometry(2000, 32, 16);
     const skyMaterial = new THREE.ShaderMaterial({
@@ -399,12 +429,46 @@ export default function MidnightSeascape() {
 
     scene.add(skyDome, stars, water);
 
+    // Only the floating logo uses three's lights; water and sky shade
+    // themselves.
+    const moonlight = new THREE.DirectionalLight(COLORS.moonlight, 1.6);
+    moonlight.position.copy(moonDirection).multiplyScalar(100);
+    const fillLight = new THREE.DirectionalLight(COLORS.fillLight, 3);
+    fillLight.position.set(-20, 25, 40);
+    scene.add(moonlight, fillLight, new THREE.AmbientLight(COLORS.ambientLight, 2.5));
+
+    let logo: FloatingLogo | null = null;
+    // Anchor the logo in view and point the water's froth at its footprint.
+    const placeLogo = () => {
+      if (!logo) return;
+      const { center, yaw, halfSize } = logo.place(camera);
+      const foam = waterMaterial.uniforms;
+      foam.uFoamCenter.value.copy(center);
+      foam.uFoamAxis.value.set(Math.cos(yaw), Math.sin(yaw));
+      foam.uFoamHalfSize.value.copy(halfSize);
+    };
+    let disposed = false;
+    loadFloatingLogo()
+      .then((loaded) => {
+        if (disposed) {
+          loaded.dispose();
+          return;
+        }
+        logo = loaded;
+        placeLogo();
+        scene.add(logo.object);
+        waterMaterial.uniforms.uFoamOpacity.value = FOAM_OPACITY;
+        onLogoReadyRef.current?.();
+      })
+      .catch((e) => console.error('Floating logo unavailable', e));
+
     const resize = () => {
       const width = Math.max(1, Math.round(window.innerWidth / PIXEL_SCALE));
       const height = Math.max(1, Math.round(window.innerHeight / PIXEL_SCALE));
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      placeLogo();
     };
     resize();
     window.addEventListener('resize', resize);
@@ -414,12 +478,15 @@ export default function MidnightSeascape() {
     let frameId = requestAnimationFrame(function frame(now) {
       frameId = requestAnimationFrame(frame);
       if (now - lastFrame < FRAME_INTERVAL_MS) return;
+      const dt = Math.min((now - lastFrame) / 1000, 0.25);
       lastFrame = now;
       time.value = (now - start) / 1000;
+      logo?.update(time.value, dt);
       renderer.render(scene, camera);
     });
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', resize);
       waterGeometry.dispose();
@@ -428,6 +495,7 @@ export default function MidnightSeascape() {
       skyMaterial.dispose();
       starGeometry.dispose();
       starMaterial.dispose();
+      logo?.dispose();
       renderer.dispose();
     };
   }, []);
