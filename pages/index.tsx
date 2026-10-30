@@ -55,8 +55,13 @@ export default function Home() {
 
   const controlledFetchedEvents = function () {
     // Only fetch during operating hours (5:00–22:59).
+    // `?fetchAtNight=1` bypasses the hours check so midnight mode can be
+    // previewed with real bookings. Read from the URL at call time because the
+    // router's query is still empty on the first render.
+    const fetchAtNight =
+      new URLSearchParams(window.location.search).get('fetchAtNight') === '1';
     const nowHour = new Date().getHours();
-    if (nowHour > 22 || nowHour < 5) {
+    if (!fetchAtNight && (nowHour > 22 || nowHour < 5)) {
       return null;
     }
     fetch('/api/getEvents')
@@ -117,6 +122,7 @@ export default function Home() {
             events={section.events}
             now={section.now}
             screenFloor={screenFloor}
+            translucent={midnightMode}
           />
         ))}
       </div>
@@ -136,8 +142,12 @@ export default function Home() {
               day: 'numeric',
             }).format(currentTime)}
           </span>
+          {midnightMode && <span className='midnight-mode-tag'>Midnight mode</span>}
         </div>
-        <img className='logo' src='theDockLogoSquareColors.png' />
+        <img
+          className={midnightMode ? 'logo logo--midnight' : 'logo'}
+          src={midnightMode ? 'theDockLogoWhite.png' : 'theDockLogoSquareColors.png'}
+        />
       </div>
     </div>
   );
@@ -148,18 +158,26 @@ const Section = ({
   events,
   now,
   screenFloor,
+  translucent,
 }: {
   title: string;
   events: AppBooking[];
   now?: Date;
   screenFloor: number;
+  translucent?: boolean;
 }) => {
   return (
     <section className='event_section'>
       <SectionTitle>{title}</SectionTitle>
       <div className='event_section__list'>
         {events.map((event) => (
-          <Event event={event} now={now} screenFloor={screenFloor} key={event._id} />
+          <Event
+            event={event}
+            now={now}
+            screenFloor={screenFloor}
+            translucent={translucent}
+            key={event._id}
+          />
         ))}
       </div>
     </section>

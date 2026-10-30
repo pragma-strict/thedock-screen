@@ -64,3 +64,9 @@ To avoid hardcoding a database id, `OfficeRnDService.getCoffeePlanId` resolves t
 `OfficeRnDDataAggregator` matches each booking's `extras` against the resolved coffee plan id and sets `AppBooking.coffeeCount` (0 when no coffee). `extras` survives recurring-occurrence expansion via the `{ ...booking }` spread in `expandRecurringBookings`. The frontend (`src/components/event.tsx`) renders `☕ x{count}` on the card when `coffeeCount > 0`.
 
 The **Owl Meeting Pro** add-on works the same way. Its plan id is resolved by name (`/owl/i`) via the shared `OfficeRnDService.resolveServicePlanId` helper (which also backs `getCoffeePlanId`), the aggregator sets `AppBooking.hasOwl` when a booking's `extras` include it, and the frontend renders an owl pill (`OwlIcon`, no count — it's a presence indicator). The coffee and owl pills share `.eventBadge` styling and stack vertically in an `.eventBadges` container when a booking has both.
+
+### Midnight mode
+
+From 00:00 to 06:00 (screen-local time) the black background is replaced by an animated three.js seascape (`src/components/MidnightSeascape.tsx`), loaded client-only via `next/dynamic` so three.js is only downloaded when it's needed. The early-2000s look comes from rendering at reduced resolution (`PIXEL_SCALE`) with nearest-neighbour upscaling and 16-bit ordered dithering in the shaders; scene tuning lives in the constants at the top of the file. In midnight mode the page also uses the white logo (dimmed), shows a "Midnight mode" tag under the clock, and renders event cards translucent (`TRANSLUCENT_CARD_ALPHA` in `event.tsx`).
+
+Preview query params: `?midnight=1` forces midnight mode on; `?fetchAtNight=1` bypasses the 5am–10pm fetch window so it can be seen with real bookings.
