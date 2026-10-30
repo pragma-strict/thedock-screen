@@ -31,6 +31,11 @@ const MOON_AZIMUTH = 20;
 const MOON_ANGULAR_RADIUS = 1.6; // degrees
 
 const STAR_COUNT = 1500;
+// Twinkle: how fast (multiplier on each star's own rate) and how deep the
+// dips go (0 = steady, 1 = can blink out). Stars near the horizon, seen
+// through more air, twinkle harder.
+const TWINKLE_SPEED = 0.45;
+const TWINKLE_DEPTH = 1.0;
 
 // Water mesh: rows spaced geometrically with distance so detail is dense near
 // the camera and sparse toward the horizon, and each row only as wide as the
@@ -246,14 +251,24 @@ const SKY_FRAGMENT = /* glsl */ `
 
 const STAR_VERTEX = /* glsl */ `
   uniform float uTime;
+  uniform float uTwinkleSpeed;
+  uniform float uTwinkleDepth;
   attribute float aSize;
   attribute float aBrightness;
   attribute float aPhase;
   varying float vAlpha;
   void main() {
-    float twinkle = 0.7 + 0.3 * sin(uTime * (0.6 + aPhase * 0.25) + aPhase * 6.2831);
+    float elevation = normalize(position).y;
+    // Two out-of-step waves per star make an irregular flicker; squaring the
+    // dip keeps stars mostly bright with occasional sharp drops.
+    float t = uTime * uTwinkleSpeed;
+    float rate = 2.0 + aPhase * 4.0;
+    float wave = 0.5 + 0.25 * (sin(t * rate + aPhase * 6.2831) +
+                               sin(t * rate * 2.37 + aPhase * 17.0));
+    float depth = uTwinkleDepth * mix(1.0, 0.5, smoothstep(0.0, 0.6, elevation));
+    float twinkle = 1.0 - depth * pow(1.0 - wave, 2.0);
     // Stars dim into the haze near the horizon.
-    float haze = smoothstep(0.0, 0.2, normalize(position).y);
+    float haze = smoothstep(0.0, 0.2, elevation);
     vAlpha = aBrightness * twinkle * haze;
     gl_PointSize = aSize;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -417,6 +432,8 @@ export default function MidnightSeascape({
       fragmentShader: STAR_FRAGMENT,
       uniforms: {
         uTime: time,
+        uTwinkleSpeed: { value: TWINKLE_SPEED },
+        uTwinkleDepth: { value: TWINKLE_DEPTH },
         uStarColor: { value: hexToVec3(COLORS.star) },
       },
       blending: THREE.AdditiveBlending,

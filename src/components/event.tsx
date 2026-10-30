@@ -163,7 +163,7 @@ const formatTime = (date: Date | number) => {
 const meridiemOf = (time: string) => time.match(/(AM|PM)$/i)?.[0];
 const stripMeridiem = (time: string) => time.replace(/\s*(AM|PM)$/i, '');
 
-const TRANSLUCENT_CARD_ALPHA = 0.7;
+const TRANSLUCENT_CARD_ALPHA = 0.65;
 
 // '#RRGGBB' → 'rgba(r, g, b, alpha)'.
 const withAlpha = (hex: string, alpha: number): string => {
