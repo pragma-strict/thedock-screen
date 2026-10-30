@@ -1,4 +1,5 @@
 import Event from '@/src/components/event';
+import { isMidnightMode } from '@/src/helpers/isMidnightMode';
 import { sortEventsByProximityToNow } from '@/src/helpers/sortEventsByProximityToNow';
 import { sortBookingByTimeAsc } from '@/src/helpers/sortEventsByStartTimeAsc';
 import {
@@ -6,6 +7,7 @@ import {
   TrimExpiredEvents,
 } from '@/src/misc/dataProcessing/processEvents';
 import { AppBooking } from '@/src/services/OfficeRnDTypes/Booking';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import React, { PropsWithChildren, useState, useEffect } from 'react';
 
@@ -14,6 +16,13 @@ import React, { PropsWithChildren, useState, useEffect } from 'react';
 // while the (relatively expensive) API fetch happens only every few minutes.
 const SCREEN_UPDATE_INTERVAL = 1000; // 1 second — keeps clock + countdowns live
 const DATA_FETCH_INTERVAL = 300000; // 5 minutes
+
+// The midnight seascape uses WebGL (three.js), so it's client-only and its code
+// is only downloaded once midnight mode actually turns on.
+const MidnightSeascape = dynamic(
+  () => import('@/src/components/MidnightSeascape'),
+  { ssr: false },
+);
 
 export default function Home() {
   const [currentTime, setRealTime] = useState(new Date());
@@ -29,8 +38,12 @@ export default function Home() {
   // Which floor is this screen on? Set per kiosk via the URL (e.g. /?floor=1).
   // Events on the same floor show no floor label; events elsewhere show
   // "Upstairs"/"Downstairs" relative to this value.
-  const { floor } = useRouter().query;
+  const { floor, midnight } = useRouter().query;
   const screenFloor = parseScreenFloor(floor);
+
+  // Midnight mode swaps the black background for an animated seascape between
+  // 00:00 and 06:00. `?midnight=1` forces it on for previewing during the day.
+  const midnightMode = midnight === '1' || isMidnightMode(currentTime);
 
   // Raw buckets from the API: today's events (regardless of started/finished)
   // and tomorrow's. The started/upcoming/finished split is derived below from
@@ -95,6 +108,7 @@ export default function Home() {
 
   return (
     <div className='event_page'>
+      {midnightMode && <MidnightSeascape />}
       <div className='child_section left_section no-scrollbar'>
         {sections.map((section) => (
           <Section
