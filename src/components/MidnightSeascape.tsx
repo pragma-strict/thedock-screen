@@ -52,7 +52,7 @@ const FOG_DENSITY = 0.0025;
 // Water opacity looking straight down into it; it turns fully opaque toward
 // grazing angles and into the haze. What shows through is the submerged part
 // of the logo, or the sky dome's horizon color where there's nothing below.
-const WATER_OPACITY = 0.3;
+const WATER_OPACITY = 0.5;
 
 // Froth where the floating logo meets the water: strongest at the hull and
 // fading out over FOAM_WIDTH meters, broken up by noise and ripples that
