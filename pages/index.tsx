@@ -1,4 +1,5 @@
 import Event from '@/src/components/event';
+import { isMidnightMode } from '@/src/helpers/isMidnightMode';
 import { sortEventsByProximityToNow } from '@/src/helpers/sortEventsByProximityToNow';
 import { sortBookingByTimeAsc } from '@/src/helpers/sortEventsByStartTimeAsc';
 import {
@@ -6,6 +7,7 @@ import {
   TrimExpiredEvents,
 } from '@/src/misc/dataProcessing/processEvents';
 import { AppBooking } from '@/src/services/OfficeRnDTypes/Booking';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import React, { PropsWithChildren, useState, useEffect } from 'react';
 
@@ -14,6 +16,13 @@ import React, { PropsWithChildren, useState, useEffect } from 'react';
 // while the (relatively expensive) API fetch happens only every few minutes.
 const SCREEN_UPDATE_INTERVAL = 1000; // 1 second — keeps clock + countdowns live
 const DATA_FETCH_INTERVAL = 300000; // 5 minutes
+
+// The midnight seascape uses WebGL (three.js), so it's client-only and its code
+// is only downloaded once midnight mode actually turns on.
+const MidnightSeascape = dynamic(
+  () => import('@/src/components/MidnightSeascape'),
+  { ssr: false },
+);
 
 export default function Home() {
   const [currentTime, setRealTime] = useState(new Date());
@@ -29,8 +38,18 @@ export default function Home() {
   // Which floor is this screen on? Set per kiosk via the URL (e.g. /?floor=1).
   // Events on the same floor show no floor label; events elsewhere show
   // "Upstairs"/"Downstairs" relative to this value.
-  const { floor } = useRouter().query;
+  const { floor, midnight } = useRouter().query;
   const screenFloor = parseScreenFloor(floor);
+
+  // Midnight mode swaps the black background for an animated seascape between
+  // 00:00 and 06:00. `?midnight=1` forces it on for previewing during the day.
+  const midnightMode = midnight === '1' || isMidnightMode(currentTime);
+  // The seascape's floating 3D logo replaces the flat one once it has loaded;
+  // until then (or if it fails) the flat white logo stays put.
+  const [floatingLogoReady, setFloatingLogoReady] = useState(false);
+  useEffect(() => {
+    if (!midnightMode) setFloatingLogoReady(false);
+  }, [midnightMode]);
 
   // Raw buckets from the API: today's events (regardless of started/finished)
   // and tomorrow's. The started/upcoming/finished split is derived below from
@@ -42,8 +61,13 @@ export default function Home() {
 
   const controlledFetchedEvents = function () {
     // Only fetch during operating hours (5:00–22:59).
+    // `?fetchAtNight=1` bypasses the hours check so midnight mode can be
+    // previewed with real bookings. Read from the URL at call time because the
+    // router's query is still empty on the first render.
+    const fetchAtNight =
+      new URLSearchParams(window.location.search).get('fetchAtNight') === '1';
     const nowHour = new Date().getHours();
-    if (nowHour > 22 || nowHour < 5) {
+    if (!fetchAtNight && (nowHour > 22 || nowHour < 5)) {
       return null;
     }
     fetch('/api/getEvents')
@@ -95,6 +119,9 @@ export default function Home() {
 
   return (
     <div className='event_page'>
+      {midnightMode && (
+        <MidnightSeascape onLogoReady={() => setFloatingLogoReady(true)} />
+      )}
       <div className='child_section left_section no-scrollbar'>
         {sections.map((section) => (
           <Section
@@ -103,6 +130,7 @@ export default function Home() {
             events={section.events}
             now={section.now}
             screenFloor={screenFloor}
+            translucent={midnightMode}
           />
         ))}
       </div>
@@ -122,8 +150,18 @@ export default function Home() {
               day: 'numeric',
             }).format(currentTime)}
           </span>
+          {midnightMode && <span className='midnight-mode-tag'>Midnight mode</span>}
         </div>
-        <img className='logo' src='theDockLogoSquareColors.png' />
+        <img
+          className={
+            midnightMode
+              ? floatingLogoReady
+                ? 'logo logo--hidden'
+                : 'logo logo--midnight'
+              : 'logo'
+          }
+          src={midnightMode ? 'theDockLogoWhite.png' : 'theDockLogoSquareColors.png'}
+        />
       </div>
     </div>
   );
@@ -134,18 +172,26 @@ const Section = ({
   events,
   now,
   screenFloor,
+  translucent,
 }: {
   title: string;
   events: AppBooking[];
   now?: Date;
   screenFloor: number;
+  translucent?: boolean;
 }) => {
   return (
     <section className='event_section'>
       <SectionTitle>{title}</SectionTitle>
       <div className='event_section__list'>
         {events.map((event) => (
-          <Event event={event} now={now} screenFloor={screenFloor} key={event._id} />
+          <Event
+            event={event}
+            now={now}
+            screenFloor={screenFloor}
+            translucent={translucent}
+            key={event._id}
+          />
         ))}
       </div>
     </section>

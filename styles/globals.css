@@ -265,3 +265,46 @@ a {
 .noWrap {
   white-space: nowrap;
 }
+
+/* Midnight mode background. Fixed behind the whole page (z-index -1 still
+   paints above the body's black background). The canvas renders at reduced
+   resolution and is stretched to fill the screen with nearest-neighbour
+   scaling for chunky early-2000s pixels. */
+.midnight-seascape {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+/* Small muted tag under the clock while midnight mode is active. */
+.midnight-mode-tag {
+  align-self: flex-end;
+  margin-top: 0.4rem;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  /* Night-sky blue so it sits in the scene rather than on top of it. */
+  color: #6f8fd6;
+  border: 1px solid rgba(111, 143, 214, 0.45);
+  /* Just enough fill to hide stars twinkling behind the text. */
+  background: rgba(3, 8, 22, 0.65);
+  border-radius: 0.3rem;
+}
+
+/* The white logo is much brighter than the colour one; tone it down so it
+   sits back in the night scene. */
+.logo--midnight {
+  opacity: 0.6;
+}
+
+/* Replaced by the seascape's floating 3D logo. Hidden rather than removed so
+   the right column's layout doesn't shift. */
+.logo--hidden {
+  visibility: hidden;
+}

@@ -8,12 +8,19 @@ export default function Event({
   event,
   now,
   screenFloor,
+  translucent,
 }: {
   event: AppBooking;
   now?: Date;
   screenFloor: number;
+  // Midnight mode: let the seascape show through the card body. Badges stay
+  // opaque so their icons remain legible against the water.
+  translucent?: boolean;
 }) {
   const colors = getFloorColors(event);
+  const cardBackground = translucent
+    ? withAlpha(colors.background, TRANSLUCENT_CARD_ALPHA)
+    : colors.background;
   const messageRef = useRef<null | HTMLDivElement>(null);
 
   // Organization sits top-left in all cases; the meeting summary is the title.
@@ -26,7 +33,7 @@ export default function Event({
   const floorLabel = offScreenFloorLabel(event.floor, screenFloor);
 
   return (
-    <div ref={messageRef} className='event' style={{ backgroundColor: colors.background }}>
+    <div ref={messageRef} className='event' style={{ backgroundColor: cardBackground }}>
       {event.coffeeCount > 0 || event.hasOwl ? (
         <div className='eventBadges'>
           {event.coffeeCount > 0 ? (
@@ -155,6 +162,14 @@ const formatTime = (date: Date | number) => {
 // en-US short time always ends in "AM"/"PM" (e.g. "1:00 PM").
 const meridiemOf = (time: string) => time.match(/(AM|PM)$/i)?.[0];
 const stripMeridiem = (time: string) => time.replace(/\s*(AM|PM)$/i, '');
+
+const TRANSLUCENT_CARD_ALPHA = 0.65;
+
+// '#RRGGBB' → 'rgba(r, g, b, alpha)'.
+const withAlpha = (hex: string, alpha: number): string => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+};
 
 // Card background (the floor's primary tone) + matching accent (its lighter
 // tint) for an event's floor. Defaults to Floor 1's colors when the floor is
