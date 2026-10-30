@@ -31,7 +31,7 @@ In production these are set in the Railway project settings.
 
 ### Data Flow
 
-1. **Frontend** (`pages/index.tsx`) polls `/api/getEvents` every 4 minutes (only between 5am–10pm). Refreshes the clock display every 3 seconds.
+1. **Frontend** (`pages/index.tsx`) polls `/api/getEvents` every 5 minutes (only between 5am–10pm, unless `?fetchAtNight=1`). Ticks the clock every second, re-deriving started/upcoming/finished events from it.
 2. **API route** (`pages/api/getEvents.ts`) authenticates with OfficeRnD, fetches today's bookings, filters out cancelled/expired events, and separates them into `{started, upcoming}`.
 3. **OfficeRnDService** (`src/services/OfficeRnDService.ts`) handles OAuth token acquisition and all OfficeRnD REST calls (bookings, meeting rooms, floors, teams, members). It fetches the booking series overlapping the window, then expands recurring series into concrete occurrences (`expandRecurringBookings`). Has an in-memory cache (3-day TTL) for relatively static data (rooms, floors, teams, members).
 4. **OfficeRnDDataAggregator** (`src/services/OfficeRnDDataAggregator.tsx`) joins raw OfficeRnD entities (bookings + rooms + floors + teams + members) into `AppBooking` objects used by the frontend.
@@ -74,3 +74,16 @@ The wave height field is defined once in `src/components/seascape/waves.ts` (`WA
 The bottom-right logo is replaced by a 3D one (`src/components/seascape/floatingLogo.ts`) extruded at runtime from the traced `public/theDockLogoSVG_1.svg` (one slab per fill colour), which bobs on the waves, sits partly submerged, and gets shader froth around its waterline footprint. The flat white logo stays visible until it loads (`onLogoReady`), so a failed load never leaves the corner empty.
 
 Preview query params: `?midnight=1` forces midnight mode on; `?fetchAtNight=1` bypasses the 5am–10pm fetch window so it can be seen with real bookings.
+
+#### Future midnight mode ideas
+
+Not built yet (v1 shipped without them). Notes on where each would hook in:
+
+- **Star movement** — slow rotation of the sky about a celestial pole: rotate the `stars` Points object each frame (stars are already positioned on a sphere around the camera).
+- **Moon movement** — `moonDirection` is currently a module constant baked into the sky/water uniforms (`uMoonDir`), the moonlight `DirectionalLight`, and the star placement (stars keep clear of the moon). Make it per-frame state and update all three; stars near the moon's path would need a fade rather than a fixed clearance.
+- **Moon phases** — shade the disc in `SKY_FRAGMENT` with a terminator (compare the disc-local position against a phase-dependent sun direction); could follow the real lunar phase from the date. Dim the glow, glitter path, and moonlight intensity with illumination.
+- **Blood moons** — swap `COLORS.moon`/`moonGlow` (and the water's `uMoonColor`, which tints the glitter path) toward deep red; could key off real lunar eclipse dates or be a rare random night.
+- **Star colours** — add a per-star color attribute in `buildStarGeometry` (blue-white to warm orange) and use it in `STAR_FRAGMENT` instead of the single `uStarColor`.
+- **Shooting stars** — occasional short-lived streaks across the sky dome on a random timer (a line or stretched quad, fading along its length).
+- **Weather** — vary wave intensity over the night (calm ↔ choppy). Scale octave amplitudes via a uniform in the generated GLSL *and* the same factor in the JS `waterHeight`, so the floating logo keeps riding the waves the shader draws; could pair with fog density, cloud cover, or dimmer stars.
+- **Other rare events** floated earlier: a UFO crossing the sky, etc.
