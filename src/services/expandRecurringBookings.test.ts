@@ -79,3 +79,34 @@ test('expired recurring series (COUNT exhausted before window) yields nothing', 
   });
   expect(expandRecurringBookings([b], windowStart, windowEnd)).toEqual([]);
 });
+
+test('after BC went permanent UTC-7 (Nov 2026), occurrences keep their wall-clock time', () => {
+  // Weekly Tuesday 10:00, anchored in summer (PDT, -07:00). Node's bundled
+  // tzdata would fall back to PST (-08:00) and land it at 11:00 local.
+  const b = booking({
+    start: '2026-06-02T17:00:00.000Z',
+    end: '2026-06-02T18:00:00.000Z',
+    recurrence: { rrule: 'FREQ=WEEKLY;BYDAY=TU;WKST=SU' },
+  });
+  const out = expandRecurringBookings(
+    [b],
+    new Date('2026-11-03T07:00:00.000Z'),
+    new Date('2026-11-05T07:00:00.000Z'),
+  );
+  expect(out.map((o) => o.start)).toEqual(['2026-11-03T17:00:00.000Z']);
+});
+
+test('a series anchored in an old PST winter still resolves at its local time', () => {
+  // Weekly Tuesday 10:00 anchored Jan 2025 (PST, -08:00 => 18:00Z).
+  const b = booking({
+    start: '2025-01-07T18:00:00.000Z',
+    end: '2025-01-07T19:00:00.000Z',
+    recurrence: { rrule: 'FREQ=WEEKLY;BYDAY=TU;WKST=SU' },
+  });
+  const out = expandRecurringBookings(
+    [b],
+    new Date('2026-11-03T07:00:00.000Z'),
+    new Date('2026-11-05T07:00:00.000Z'),
+  );
+  expect(out.map((o) => o.start)).toEqual(['2026-11-03T17:00:00.000Z']);
+});

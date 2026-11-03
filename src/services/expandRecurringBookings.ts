@@ -1,8 +1,7 @@
 import { RRule } from 'rrule';
-import { DateTime } from 'luxon';
+import { DateTime, Zone } from 'luxon';
 import { OfficeRnDBooking } from './OfficeRnDTypes/Booking';
-
-const FALLBACK_ZONE = 'America/Vancouver';
+import { resolveZone } from '../helpers/venueTimeZone';
 
 // OfficeRnD returns a recurring booking as a single anchor row carrying an iCal
 // RRULE; it does not materialize later occurrences. This expands the bookings in
@@ -42,7 +41,7 @@ export function expandRecurringBookings(
       continue;
     }
 
-    const zone = booking.timezone || FALLBACK_ZONE;
+    const zone = resolveZone(booking.timezone);
     const anchorStart = DateTime.fromISO(booking.start, { zone: 'utc' }).setZone(zone);
     const durationMs =
       new Date(booking.end).getTime() - new Date(booking.start).getTime();
@@ -96,7 +95,7 @@ function toFloating(dt: DateTime): Date {
 
 // Inverse of toFloating: read a floating Date's wall-clock numbers as a time in
 // `zone`, producing the correct absolute instant (applying that day's offset).
-function fromFloating(d: Date, zone: string): DateTime {
+function fromFloating(d: Date, zone: Zone | string): DateTime {
   return DateTime.fromObject(
     {
       year: d.getUTCFullYear(),

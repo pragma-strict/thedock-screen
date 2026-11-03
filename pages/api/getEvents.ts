@@ -6,8 +6,9 @@ import {
   TrimExpiredEvents,
 } from '../../src/misc/dataProcessing/processEvents';
 import { OfficeRnDService } from '../../src/services/OfficeRnDService';
+import { VENUE_ZONE } from '../../src/helpers/venueTimeZone';
 
-const TIMEZONE = 'America/Vancouver';
+const TIMEZONE = VENUE_ZONE;
 
 // Reuse one service instance across requests so its OAuth token and 3-day cache
 // (rooms, floors, plans, members, companies) persist between polls. A fresh

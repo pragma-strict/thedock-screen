@@ -1,5 +1,5 @@
 import { AppBooking } from "@/src/services/OfficeRnDTypes/Booking";
-import { DateTime } from "luxon";
+import { DateTime, Zone } from "luxon";
 
 export function TrimExpiredEvents(events: Array<AppBooking>, dateTimeToCompare: Date) {
     return events.filter((event) => {
@@ -38,7 +38,7 @@ export function SeparateStartedAndUpcomingEvents<T extends HasStartDateTime>(eve
 export function SeparateTodayAndTomorrowEvents<T extends HasStartDateTime>(
     events: Array<T>,
     now: Date,
-    timezone: string,
+    timezone: Zone | string,
 ) {
     const todayDate = DateTime.fromJSDate(now).setZone(timezone).toISODate();
     const out = { today: Array<T>(), tomorrow: Array<T>() };
