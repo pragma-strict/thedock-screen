@@ -1,3 +1,7 @@
+import {
+  correctLegacyVancouverTimes,
+  LEGACY_VANCOUVER_FIX_ENABLED,
+} from './correctLegacyVancouverTimes';
 import { OfficeRnDDataAggregator } from './OfficeRnDDataAggregator';
 import { expandRecurringBookings } from './expandRecurringBookings';
 import { AppBooking, OfficeRnDBooking } from './OfficeRnDTypes/Booking';
@@ -208,7 +212,12 @@ export class OfficeRnDService {
     const floors = await this.getFloors();
     const meetingRooms = await this.getMeetingRooms();
     const allEvents = await this.getEvents(dateStart, dateEnd);
-    const events = this.filterCancelledEvents(allEvents);
+    const activeEvents = this.filterCancelledEvents(allEvents);
+    // Undo OfficeRnD's stale-PST storage of `America/Vancouver` bookings before
+    // anything reads their times (see correctLegacyVancouverTimes).
+    const events = LEGACY_VANCOUVER_FIX_ENABLED
+      ? correctLegacyVancouverTimes(activeEvents)
+      : activeEvents;
     // Expand recurring series into concrete occurrences within the window, and
     // drop one-off bookings that fall outside it (the overlap query can return
     // series whose anchor occurrence is before the window).

@@ -47,6 +47,13 @@ In production these are set in the Railway project settings.
 
 Events use `luxon` for timezone-aware date comparison. OfficeRnD bookings carry a `timezone` field (e.g. `America/Vancouver`). The `/api/getEvents` query window is built from `America/Vancouver` day boundaries converted to absolute UTC instants — OfficeRnD interprets bare date strings as UTC midnight, so sending bare dates would shift the window by the venue's UTC offset and drop today's evening bookings.
 
+### BC's permanent UTC-7 (Nov 2026)
+
+BC stopped changing clocks and stayed on UTC-7 from 2026-11-01. Two consequences, both handled in `src/helpers/venueTimeZone.ts`:
+
+- **Our runtime's tz data may be stale** (Node 22 bundles tz 2025a, which still falls back to PST). Server-side venue-time math uses `VENUE_ZONE` (real Vancouver history, then fixed UTC-7) instead of the `America/Vancouver` string.
+- **OfficeRnD's tz data is stale.** Bookings tagged `timezone: "America/Vancouver"` have their UTC instants stored using PST, i.e. an hour late; OfficeRnD's calendar hides this by displaying them with the same stale rules. The OfficeRnD location was switched to `Canada/Yukon` (permanent UTC-7), so new bookings carry that zone and are stored correctly. `correctLegacyVancouverTimes` (applied in `OfficeRnDService` before expansion) reads `America/Vancouver` instants as wall-clock under OfficeRnD's legacy rules (`OFFICERND_LEGACY_VANCOUVER_ZONE`) and re-anchors them in `VENUE_ZONE`. Once OfficeRnD fixes its data, this would double-correct: set `OFFICERND_LEGACY_VANCOUVER_FIX=0` in Railway to disable it, then remove the code.
+
 ### Recurring bookings
 
 The OfficeRnD v2 `bookings` endpoint can only be filtered by `seriesStart`/`seriesEnd` (not occurrence `start`/`end`), and it returns a recurring booking as a **single anchor row carrying an `rrule`** — it does not materialize later occurrences. To surface recurring meetings, `OfficeRnDService.getEvents` uses an **overlap query** (`seriesStart[$lt]=windowEnd & seriesEnd[$gte]=windowStart`) to fetch every series touching the window, and `expandRecurringBookings` (`src/services/expandRecurringBookings.ts`) expands each series' `rrule` (via the `rrule` package) into concrete occurrences within the today/tomorrow window. One-off bookings pass through; each recurring occurrence becomes its own booking with a unique `_id`.
