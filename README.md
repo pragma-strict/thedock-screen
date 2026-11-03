@@ -33,6 +33,7 @@ Open http://localhost:3000.
 | `OFFICERND_CLIENT_ID` | Yes | OfficeRnD OAuth2 client ID |
 | `OFFICERND_CLIENT_SECRET` | Yes | OfficeRnD OAuth2 client secret |
 | `OFFICERND_SCOPE` | No | OAuth2 scopes (defaults to the read scopes this app needs) |
+| `OFFICERND_LEGACY_VANCOUVER_FIX` | No | Set to `0` to disable the correction for OfficeRnD's stale-PST `America/Vancouver` booking times (see CLAUDE.md). Leave unset unless OfficeRnD has fixed its data. |
 
 ## Deployment
 

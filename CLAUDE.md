@@ -22,6 +22,7 @@ Copy `.env.template` to `.env` and fill in the OfficeRnD OAuth2 credentials:
 - `OFFICERND_CLIENT_ID` — OAuth2 client ID (required)
 - `OFFICERND_CLIENT_SECRET` — OAuth2 client secret (required)
 - `OFFICERND_SCOPE` — OAuth2 scopes (optional; falls back to `DEFAULT_SCOPE` in `OfficeRnDService.ts`, which covers the read scopes this app needs)
+- `OFFICERND_LEGACY_VANCOUVER_FIX` — optional; set to `0` to disable the correction for OfficeRnD's stale-PST `America/Vancouver` bookings (see [BC's permanent UTC-7](#bcs-permanent-utc-7-nov-2026)). Leave unset unless OfficeRnD has fixed its data.
 
 In production these are set in the Railway project settings.
 
@@ -45,14 +46,14 @@ In production these are set in the Railway project settings.
 
 ### Timezone Handling
 
-Events use `luxon` for timezone-aware date comparison. OfficeRnD bookings carry a `timezone` field (e.g. `America/Vancouver`). The `/api/getEvents` query window is built from `America/Vancouver` day boundaries converted to absolute UTC instants — OfficeRnD interprets bare date strings as UTC midnight, so sending bare dates would shift the window by the venue's UTC offset and drop today's evening bookings.
+Events use `luxon` for timezone-aware date comparison. OfficeRnD bookings carry a `timezone` field (e.g. `America/Vancouver`). The `/api/getEvents` query window is built from venue-day boundaries (`VENUE_ZONE`, see below) converted to absolute UTC instants — OfficeRnD interprets bare date strings as UTC midnight, so sending bare dates would shift the window by the venue's UTC offset and drop today's evening bookings.
 
 ### BC's permanent UTC-7 (Nov 2026)
 
 BC stopped changing clocks and stayed on UTC-7 from 2026-11-01. Two consequences, both handled in `src/helpers/venueTimeZone.ts`:
 
 - **Our runtime's tz data may be stale** (Node 22 bundles tz 2025a, which still falls back to PST). Server-side venue-time math uses `VENUE_ZONE` (real Vancouver history, then fixed UTC-7) instead of the `America/Vancouver` string.
-- **OfficeRnD's tz data is stale.** Bookings tagged `timezone: "America/Vancouver"` have their UTC instants stored using PST, i.e. an hour late; OfficeRnD's calendar hides this by displaying them with the same stale rules. The OfficeRnD location was switched to `Canada/Yukon` (permanent UTC-7), so new bookings carry that zone and are stored correctly. `correctLegacyVancouverTimes` (applied in `OfficeRnDService` before expansion) reads `America/Vancouver` instants as wall-clock under OfficeRnD's legacy rules (`OFFICERND_LEGACY_VANCOUVER_ZONE`) and re-anchors them in `VENUE_ZONE`. Once OfficeRnD fixes its data, this would double-correct: set `OFFICERND_LEGACY_VANCOUVER_FIX=0` in Railway to disable it, then remove the code.
+- **OfficeRnD's tz data is stale.** Bookings tagged `timezone: "America/Vancouver"` have their UTC instants stored using PST, i.e. an hour late; OfficeRnD's calendar hides this by displaying them with the same stale rules. The OfficeRnD location was switched to `Canada/Yukon` (permanent UTC-7), so new bookings carry that zone and are stored correctly. `correctLegacyVancouverTimes` (applied in `OfficeRnDService` before expansion) reads `America/Vancouver` instants as wall-clock under OfficeRnD's legacy rules (`OFFICERND_LEGACY_VANCOUVER_ZONE`) and re-anchors them in `VENUE_ZONE`. Once OfficeRnD fixes its data, this would double-correct: set `OFFICERND_LEGACY_VANCOUVER_FIX=0` in Railway to disable it, then remove the code. To check whether OfficeRnD has fixed it: compare an `America/Vancouver` booking's time in OfficeRnD's calendar with its raw API `start` (still broken if the calendar time equals the API instant read at UTC-8). Diagnosed 2026-11-03 against real bookings (Dometic Marine 1–4 PM stored as 21:00–00:00Z; Gather & Stitch 5:30 PM stored as 01:30Z).
 
 ### Recurring bookings
 
